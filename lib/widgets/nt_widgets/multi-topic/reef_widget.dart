@@ -5,43 +5,52 @@ import 'package:flutter/material.dart';
 import 'package:flutter_image_map/flutter_image_map.dart';
 import 'package:provider/provider.dart';
 
+enum Mode {
+  unknown,
+  algae,
+  coral,
+  coralAndAlgae,
+}
+
+enum ReefLocation { unknown, L1, L2_L, L2_R, L3_L, L3_R, L4_L, L4_R }
+
 class ReefWidgetModel extends MultiTopicNTWidgetModel {
   @override
   String type = ReefWidget.widgetType;
 
-  String get algaeLoadedTopic => '$topic/algaeLoaded';
   late NT4Subscription algaeLoadedSubscription;
-  
-  String get coralLoadedTopic => '$topic/coralLoaded';
   late NT4Subscription coralLoadedSubscription;
-  
-  String get executeCommandTopic => '$topic/executeCommand';
   late NT4Subscription executeCommandSubscription;
+  late NT4Topic executeCommandTopic;
 
+  late NT4Topic modeTopic;
+  late NT4Topic destTopic;
+  late NT4Topic reefSegmentTopic;
+  late NT4Topic reefPostTopic;
 
   @override
   List<NT4Subscription> get subscriptions => [
-    algaeLoadedSubscription,
-    coralLoadedSubscription,
-    executeCommandSubscription,
-  ];
+        algaeLoadedSubscription,
+        coralLoadedSubscription,
+        executeCommandSubscription,
+      ];
 
-
-  int selectedRegion = 0;
-  String? selectedPipe;
+  int selectedReefSegment = 0;
+  ReefLocation reefLocation = ReefLocation.unknown;
   bool coralValid = true;
-  bool algaeValid = true;
   bool coralAndAlgaeValid = true;
 
   bool coralLoaderSelected = false;
   bool processorSelected = false;
   bool bargeSelected = false;
-  
-  bool showReef = true;
-  bool showProcessor = false;
-  bool showPipes = true;
-  bool showCoralLoader = false;
-  bool showBarge = false;
+  bool floorAlgaeSelected = false;
+  bool reefAlgaeSelected = false;
+  bool algaeOnCoralSelected = false;
+
+  String loadPieceText = "Load Piece";
+  String selectDestinationText = "Select Destination";
+  String instructionText = "";
+  bool loaded = false;
 
   ReefWidgetModel({
     required super.ntConnection,
@@ -65,9 +74,21 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
   }
 
   void initSubscriptions() {
-    algaeLoadedSubscription = ntConnection.subscribe(algaeLoadedTopic, super.period);
-    coralLoadedSubscription = ntConnection.subscribe(coralLoadedTopic, super.period);
-    executeCommandSubscription = ntConnection.subscribe(executeCommandTopic, super.period);
+    algaeLoadedSubscription =
+        ntConnection.subscribe('$topic/algaeLoaded', super.period);
+    coralLoadedSubscription =
+        ntConnection.subscribe('$topic/coralLoaded', super.period);
+    executeCommandTopic =
+        ntConnection.publishNewTopic('$topic/executeCommand', NT4TypeStr.kBool);
+    executeCommandSubscription =
+        ntConnection.subscribe(executeCommandTopic.name, super.period);
+
+    modeTopic = ntConnection.publishNewTopic('$topic/mode', NT4TypeStr.kString);
+    destTopic = ntConnection.publishNewTopic('$topic/dest', NT4TypeStr.kString);
+    reefSegmentTopic =
+        ntConnection.publishNewTopic('$topic/reefSegment', NT4TypeStr.kInt);
+    reefPostTopic =
+        ntConnection.publishNewTopic('$topic/reefPost', NT4TypeStr.kString);
   }
 
   @override
@@ -81,36 +102,41 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
     super.resetSubscription();
   }
 
-  String mode = "";
-  
+  Mode mode = Mode.unknown;
+
   Color getCoralAndAlgaeColor() {
-    return mode == "coral_and_algae" ? Colors.green : Colors.black;
+    return mode == Mode.coralAndAlgae ? Colors.green : Colors.black;
   }
 
   Color getAlgaeColor() {
-    return mode == "algae" ? Colors.green : Colors.black;
+    return mode == Mode.algae ? Colors.green : Colors.black;
   }
 
- Color getCoralColor() {
-    return mode == "coral" ? Colors.green : Colors.black;
+  Color getCoralColor() {
+    return mode == Mode.coral ? Colors.green : Colors.black;
   }
 
   void onCoralButtonPressed() {
     print('onCoralButtonPressed');
-    mode = "coral";
+    mode = Mode.coral;
+    if (!loaded) {
+      coralLoaderSelected = true;
+    }
     _validateSelection();
   }
 
   void onAlgaeButtonPressed() {
     print('onAlgaeButtonPressed');
-    mode = "algae";
+    mode = Mode.algae;
+    reefLocation = ReefLocation.unknown;
     _validateSelection();
   }
 
   void onCoralAndAlgaeButtonPressed() {
     print('onCoralAndAlgaeButtonPressed.');
     if (coralAndAlgaeValid) {
-      mode = "coral_and_algae";
+      mode = Mode.coralAndAlgae;
+      reefLocation = ReefLocation.unknown;
     }
     _validateSelection();
   }
@@ -127,14 +153,14 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
     return tryCast(executeCommandSubscription.value) == true;
   }
 
-  void _validateSelection() {
-
-    if (mode == "algae") {
+  bool _validateSelection() {
+    if (mode == Mode.algae) {
       coralLoaderSelected = false;
     }
-    showPipes = mode == "coral";
 
-    if (selectedRegion == 1 || selectedRegion == 3 || selectedRegion == 5) {
+    if (selectedReefSegment == 1 ||
+        selectedReefSegment == 3 ||
+        selectedReefSegment == 5) {
       // region 1,3,5 have high algae
       // we can't do coral and algae on high algae
       coralAndAlgaeValid = false;
@@ -145,92 +171,151 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
     bool algaeLoaded = isAlgaeLoaded();
     bool coralLoaded = isCoralLoaded();
 
-    if (coralAndAlgaeValid){
+    if (algaeLoaded || coralLoaded) {
+      loaded = true;
+      instructionText = selectDestinationText;
+    } else {
+      loaded = false;
+      instructionText = loadPieceText;
+    }
+
+    if (coralAndAlgaeValid) {
       coralAndAlgaeValid = !algaeLoaded;
     }
 
-    if (coralAndAlgaeValid){
+    if (coralAndAlgaeValid) {
       coralAndAlgaeValid = coralLoaded;
     }
 
-    coralValid = coralLoaded;
-    algaeValid = !algaeLoaded;
-    showCoralLoader = !coralLoaded;
-
-    if (!coralLoaded && mode == "coral"){
-      mode = "";
-      showPipes = false;
-    }
-
-    
-    if (coralLoaded){
+    if (coralLoaded) {
       // if we just loaded a coral, and no mode is currently selected, select coral mode
-      if( mode == "") {
-        mode = "coral";
-        showPipes = true;
+      // if it's coral_and_algae, don't do anything
+      if (mode == Mode.unknown || mode == Mode.algae) {
+        mode = Mode.coral;
       }
 
       // we have coral, unselect the loader, so the next time it shows up it's not already selected
       coralLoaderSelected = false;
+
+      reefAlgaeSelected = false;
+      floorAlgaeSelected = false;
+      algaeOnCoralSelected = false;
     }
 
-    showProcessor = algaeLoaded;
-    showBarge = algaeLoaded;
-    showReef = !algaeLoaded;
-
-    if (algaeLoaded){
-      showPipes = false;
-      showCoralLoader = false;
+    if (algaeLoaded) {
+      //when algae is loaded, only algae mode is ever valid
+      mode = Mode.algae;
       coralValid = false;
+    } else {
+      coralValid = true;
     }
 
+    if (!loaded && (mode == Mode.unknown || mode == Mode.coralAndAlgae)) {
+      // default to coral being selected
+      mode = Mode.coral;
+    }
+
+    // return true if this is a valid selection to kick off a command
+    bool valid = false;
+    if (coralLoaderSelected ||
+        bargeSelected ||
+        processorSelected ||
+        floorAlgaeSelected ||
+        algaeOnCoralSelected) {
+      // no additional options for these destinations
+      valid = true;
+    } else if (reefAlgaeSelected && selectedReefSegment != 0) {
+      valid = true;
+    }
+
+    if (isAlgaeLoaded()) {
+      if (processorSelected || bargeSelected) {
+        valid = true;
+      }
+    }
+
+    if (isCoralLoaded()) {
+      if (mode == Mode.coral) {
+        if (selectedReefSegment != 0 && reefLocation != ReefLocation.unknown) {
+          valid = true;
+        }
+      } else if (mode == Mode.coralAndAlgae) {
+        if (selectedReefSegment == 2 ||
+            selectedReefSegment == 4 ||
+            selectedReefSegment == 6) {
+          valid = true;
+        }
+      }
+    }
+    return valid;
   }
 
   void onReefSegmentPressed(int segment) {
-    selectedRegion = segment;
+    if (!reefAlgaeSelected) {
+      deselectAllDest();
+    }
+
+    selectedReefSegment = segment;
     coralLoaderSelected = false;
 
-    if (!isCoralLoaded()){
-      mode = "algae";
+    if (!isCoralLoaded()) {
+      mode = Mode.algae;
     }
 
     _validateSelection();
   }
 
-  void onPipeSelected(String pipe) {
-    selectedPipe = pipe;
+  void onPipeSelected(String pipeName) {
+    deselectAllDest();
+    reefLocation = ReefLocation.values.firstWhere((e) => e.name == pipeName);
     _validateSelection();
   }
 
-  void checkSubscriptions(){
+  void checkSubscriptions() {
     _validateSelection();
   }
 
-  void onCoralLoaderSelected() {
-    coralLoaderSelected = !coralLoaderSelected;
-    if (coralLoaderSelected) {
-      selectedRegion = 0;
-      mode = "";
-    }
-    _validateSelection();
+  void deselectAllDest() {
+    coralLoaderSelected = false;
+    bargeSelected = false;
+    processorSelected = false;
+
+    reefAlgaeSelected = false;
+    floorAlgaeSelected = false;
+    algaeOnCoralSelected = false;
   }
 
-  void onProcessorSelected() {
-    processorSelected = !processorSelected;
-    if (bargeSelected && processorSelected) {
-      bargeSelected = false;
-    }
-  }
-
-  void onBargeSelected() {
-    bargeSelected = !bargeSelected;
-    if (bargeSelected && processorSelected) {
-      processorSelected = false;
+  void onDestSelected(String dest) {
+    deselectAllDest();
+    reefLocation = ReefLocation.unknown;
+    selectedReefSegment = 0;
+    switch (dest) {
+      case "coralLoader":
+        mode = Mode.coral;
+        coralLoaderSelected = true;
+        break;
+      case "processor":
+        mode = Mode.algae;
+        processorSelected = true;
+        break;
+      case "barge":
+        mode = Mode.algae;
+        bargeSelected = true;
+        break;
+      case "floorAlgae":
+        mode = Mode.algae;
+        floorAlgaeSelected = true;
+        break;
     }
   }
 
   Color getGoButtonColor() {
-    return isCommandExecuting() ? Color.fromRGBO(255, 0, 0, 0.498) : Color.fromRGBO(50, 200, 50, 0.5);
+    if (!_validateSelection()) {
+      return ReefWidget.unselectedColor;
+    }
+    return isCommandExecuting()
+        ? Color.fromRGBO(255, 0, 0, 0.498)
+        : ReefWidget.selectedColor;
   }
 
   String getGoButtonLabel() {
@@ -241,346 +326,543 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
   }
 
   void onGoButtonPressed() {
-    NT4Topic topic = ntConnection.getTopicFromSubscription(executeCommandSubscription)!;
-    if (!ntConnection.isTopicPublished(topic)){
-      ntConnection.publishTopic(topic);
+    if (!_validateSelection()) {
+      return;
     }
-    
-    ntConnection.updateDataFromTopic(ntConnection.getTopicFromSubscription(executeCommandSubscription)!, !isCommandExecuting());
+
+    String dest;
+    if (coralLoaderSelected) {
+      dest = "coralStation";
+    } else if (bargeSelected) {
+      dest = "barge";
+    } else if (processorSelected) {
+      dest = "processor";
+    } else if (floorAlgaeSelected) {
+      dest = "floorAlgae";
+    } else {
+      dest = "reef";
+    }
+    ntConnection.updateDataFromTopic(destTopic, dest);
+    ntConnection.updateDataFromTopic(modeTopic, mode.name);
+    ntConnection.updateDataFromTopic(reefSegmentTopic, selectedReefSegment);
+    ntConnection.updateDataFromTopic(reefPostTopic, reefLocation.name);
+
+    ntConnection.updateDataFromTopic(
+        executeCommandTopic, !isCommandExecuting());
+  }
+
+  void onReefAlgaePressed() {
+    // pickup an algae from the reef
+    deselectAllDest();
+    reefAlgaeSelected = true;
+  }
+
+  void onAlgaeFloorPressed() {
+    // pickup an algae from the floor
+    deselectAllDest();
+    floorAlgaeSelected = true;
+  }
+
+  void onAlgaeOnCoralPressed() {
+    // pickup an algae from the starting position sitting on top of the coral
+    deselectAllDest();
+    algaeOnCoralSelected = true;
+  }
+
+  bool shouldShowAlgaeButton() {
+    return !isCoralLoaded();
+  }
+
+  bool shouldShowReefAlgae() {
+    return !loaded && mode == Mode.algae;
+  }
+
+  bool shouldShowFloorAlgae() {
+    return !loaded && mode == Mode.algae;
+  }
+
+  bool shouldShowAlgaeOnCoral() {
+    return !loaded && mode == Mode.algae;
+  }
+
+  bool shouldShowCoralLoader() {
+    return !loaded && mode == Mode.coral;
+  }
+
+  bool shouldShowReef() {
+    if (isAlgaeLoaded()) {
+      return false;
+    }
+
+    return (loaded && mode == Mode.coral) ||
+        (loaded && mode == Mode.coralAndAlgae) ||
+        (!loaded && mode == Mode.algae && reefAlgaeSelected);
+  }
+
+  bool shouldShowProcessor() {
+    return isAlgaeLoaded();
+  }
+
+  bool shouldShowBarge() {
+    return isAlgaeLoaded();
+  }
+
+  bool shouldShowPipes() {
+    if (isAlgaeLoaded()) {
+      return false;
+    }
+    return loaded && mode == Mode.coral;
   }
 }
 
 class ReefWidget extends NTWidget {
   static const String widgetType = 'ReefControl';
+  const ReefWidget({super.key}) : super();
+
   static const selectedColor = Color.fromRGBO(50, 200, 50, 0.5);
   static const unselectedColor = Color.fromRGBO(50, 200, 50, 0);
-
-  const ReefWidget({super.key}) : super();
 
   @override
   Widget build(BuildContext context) {
     ReefWidgetModel model = cast(context.watch<NTWidgetModel>());
     return ListenableBuilder(
-      listenable: Listenable.merge(model.subscriptions),
-      builder: (context, child) {
-        return StatefulBuilder(builder: (context, setState) {
-          setState(() => model.checkSubscriptions());
-          return Column(
-            spacing: 10,
-            children: [
-              Row(
-                children: [
-                  Visibility(
-                    visible: model.showReef,
-                    child: Container(
-                      constraints: BoxConstraints.tight(Size(500, 500)),
-                      child: ImageMap(
-                          image: Image.asset("assets/reef/reef.png",
-                              fit: BoxFit.scaleDown),
-                          onTap: (region) {
-                            setState(() => model.onReefSegmentPressed(int.parse(region.title!)));
-                          },
-                          regions: [
-                            ImageMapRegion.fromPoly(
-                              points: [
-                                const Offset(305,281),
-                                const Offset(156, 539),
-                                const Offset(454, 539),
-                              ],
-                              color: model.selectedRegion == 1
-                                  ? selectedColor
-                                  : unselectedColor,
-                              title: '1',
-                            ),
-                            ImageMapRegion.fromPoly(
-                              points: [
-                                const Offset(305,281),
-                                const Offset(454,539),
-                                const Offset(604,281),
-                              ],
-                              color: model.selectedRegion == 2
-                                  ? selectedColor
-                                  : unselectedColor,
-                              title: '2',
-                            ),
-                            ImageMapRegion.fromPoly(
-                              points: [
-                                const Offset(305,281),
-                                const Offset(604,281),
-                                const Offset(455,22),
-                              ],
-                              color: model.selectedRegion == 3
-                                  ? selectedColor
-                                  : unselectedColor,
-                              title: '3',
-                            ),
-                            ImageMapRegion.fromPoly(
-                              points: [
-                                const Offset(305,281),
-                                const Offset(455,22),
-                                const Offset(157,22),
-                              ],
-                              color: model.selectedRegion == 4
-                                  ? selectedColor
-                                  : unselectedColor,
-                              title: '4',
-                            ),
-                            ImageMapRegion.fromPoly(
-                              points: [
-                                const Offset(305,281),
-                                const Offset(157,22),
-                                const Offset(6,281),
-                              ],
-                              color: model.selectedRegion == 5
-                                  ? selectedColor
-                                  : unselectedColor,
-                              title: '5',
-                            ),
-                            ImageMapRegion.fromPoly(
-                              points: [
-                                const Offset(305,281),
-                                const Offset(6,281),
-                                const Offset(156,538),
-                              ],
-                              color: model.selectedRegion == 6
-                                  ? selectedColor
-                                  : unselectedColor,
-                              title: '6',
-                            ),
-                          ]),
-                    ),
-                  ),
-                  Visibility(
-                    visible: model.showPipes,
-                    child: Container(
-                      constraints: BoxConstraints.tight(Size(300, 500)),
-                      child: ImageMap(
-                          image: Image.asset("assets/reef/pipes.png"),
-                          onTap: (region) {
-                            setState(() => model.onPipeSelected(region.title!));
-                          },
-                          regions: [
-                            ImageMapRegion.fromCircle(
-                              center: const Offset(116, 160),
-                              radius: 100,
-                              color: model.selectedPipe == "4L"
-                                  ? selectedColor
-                                  : unselectedColor,
-                              title: '4L',
-                            ),
-                            ImageMapRegion.fromCircle(
-                              center: const Offset(347, 160),
-                              radius: 100,
-                              color: model.selectedPipe == "4R"
-                                  ? selectedColor
-                                  : unselectedColor,
-                              title: '4R',
-                            ),
-                            ImageMapRegion.fromCircle(
-                              center: const Offset(127, 421),
-                              radius: 100,
-                              color: model.selectedPipe == "3L"
-                                  ? selectedColor
-                                  : unselectedColor,
-                              title: '3L',
-                            ),
-                            ImageMapRegion.fromCircle(
-                              center: const Offset(334, 421),
-                              radius: 100,
-                              color: model.selectedPipe == "3R"
-                                  ? selectedColor
-                                  : unselectedColor,
-                              title: '3R',
-                            ),
-                            ImageMapRegion.fromCircle(
-                              center: const Offset(130, 633),
-                              radius: 100,
-                              color: model.selectedPipe == "2L"
-                                  ? selectedColor
-                                  : unselectedColor,
-                              title: '2L',
-                            ),
-                            ImageMapRegion.fromCircle(
-                              center: const Offset(334, 633),
-                              radius: 100,
-                              color: model.selectedPipe == "2R"
-                                  ? selectedColor
-                                  : unselectedColor,
-                              title: '2R',
-                            ),
-                            ImageMapRegion.fromPoly(
-                            points: [
-                              const Offset(110,731),
-                              const Offset(109,748),
-                              const Offset(76,775),
-                              const Offset(55,777),
-                              const Offset(55,949),
-                              const Offset(420,949),
-                              const Offset(421,776),
-                              const Offset(402,776),
-                              const Offset(366,747),
-                              const Offset(365,730),
-                            ],
-                            color: model.selectedPipe == "1"
-                                ? selectedColor
-                                : unselectedColor,
-                            title: '1',
-                          ),
-                          ]),
-                    ),
-                  ),
-                  Visibility(
-                    visible: model.showCoralLoader,
-                    child: Container(
-                      constraints: BoxConstraints.tight(const Size(400, 400)),
-                      child: ImageMap(
-                          image: Image.asset("assets/reef/coral_loader.png"),
-                          onTap: (region) {
-                            setState(() => model.onCoralLoaderSelected());
-                          },
-                          regions: [
-                            ImageMapRegion.fromPoly(
-                            points: [
-                              const Offset(31,467),
-                              const Offset(33,219),
-                              const Offset(101,10),
-                              const Offset(418,74),
-                              const Offset(497,108),
-                              const Offset(497,509),
-                              const Offset(347,535),
-                            ],
-                              color: model.coralLoaderSelected
-                                  ? selectedColor
-                                  : unselectedColor,
-                              title: 'Loader',
-                            )
-                          ]),
-                    ),
-                  ),
-                  Visibility(
-                    visible: model.showProcessor,
-                    child: Container(
-                      constraints: BoxConstraints.tight(const Size(400, 400)),
-                      child: ImageMap(
-                          image: Image.asset("assets/reef/processor.png"),
-                          onTap: (region) {
-                            setState(() => model.onProcessorSelected());
-                          },
-                          regions: [
-                            ImageMapRegion.fromRect(rect: Rect.fromPoints(const Offset(0,0), const Offset(613,545)),
-                              color: model.processorSelected
-                                  ? selectedColor
-                                  : unselectedColor,
-                              title: 'Processor',
-                            )
-                          ]),
-                    ),
-                  ),
-                  Visibility(
-                    visible: model.showBarge,
-                    child: Container(
-                      constraints: BoxConstraints.tight(const Size(400, 400)),
-                      child: ImageMap(
-                          image: Image.asset("assets/reef/barge.png"),
-                          onTap: (region) {
-                            setState(() => model.onBargeSelected());
-                          },
-                          regions: [
-                            ImageMapRegion.fromRect(rect: Rect.fromPoints(const Offset(0,0), const Offset(555,617)),
-                              color: model.bargeSelected
-                                  ? selectedColor
-                                  : unselectedColor,
-                              title: 'Barge',
-                            )
-                          ]),
-                    ),
-                  ),
-                ],
-              ),
-              Row(
-                spacing: 10,
-                children: [
-                  Visibility(
-                    visible: model.coralValid,
-                    child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: model.getCoralColor(),
-                          padding: const EdgeInsets.all(20.0),
-                          fixedSize: const Size(200, 125),
-                          side: const BorderSide(width: 3, color: Colors.white),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30)),
+        listenable: Listenable.merge(model.subscriptions),
+        builder: (context, child) {
+          return StatefulBuilder(builder: (context, setState) {
+            setState(() => model.checkSubscriptions());
+            return Column(
+              spacing: 10,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Center(
+                      child: Text(
+                        model.instructionText,
+                        style: const TextStyle(
+                          fontSize: 70,
+                          fontFamily: 'Arial Rounded MT Bold',
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
                         ),
-                        onPressed:() {
-                            print('onCoralButtonPressed');
-                            setState(() => model.onCoralButtonPressed());
-                        },
-                        child: Image.asset("assets/reef/coral.png")),
-                  ),
-                  Visibility(
-                    visible: model.algaeValid,
-                    child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: model.getAlgaeColor(),
-                          padding: const EdgeInsets.all(20.0),
-                          fixedSize: const Size(200, 125),
-                          side: const BorderSide(width: 3, color: Colors.white),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30)),
-                        ),
-                        onPressed:() {
-                            print('onAlgaeButtonPressed');
-                            setState(() => model.onAlgaeButtonPressed());
-                        },
-                        child: Image.asset("assets/reef/algae.png")),
-                  ),
-                  Visibility(
-                    visible: model.coralAndAlgaeValid,
-                    child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: model.getCoralAndAlgaeColor(),
-                          padding: const EdgeInsets.all(20.0),
-                          fixedSize: const Size(200, 125),
-                          side: const BorderSide(width: 3, color: Colors.white),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30)),
-                        ),
-                        onPressed:() {
-                            print('onCoralAndAlgaeButtonPressed');
-                            setState(() => model.onCoralAndAlgaeButtonPressed());
-                        },
-                        child: Image.asset("assets/reef/coral_and_algae.png")),
-                  ),
-                  const Spacer(),
-                  ElevatedButton( // GO button
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: model.getGoButtonColor(),
-                      padding: const EdgeInsets.fromLTRB(20,10,20,30),
-                      minimumSize: const Size(20, 125),
-                      
-                      side: const BorderSide(width: 3, color: Colors.white),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30)),
-                    ),
-                    onPressed:() {
-                        setState(() => model.onGoButtonPressed());
-                    },
-                    child: Text(
-                      model.getGoButtonLabel(),
-                      style: const TextStyle(
-                        fontSize: 70,
-                        fontFamily: 'Arial Rounded MT Bold',
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
                       ),
                     )
-                  ),
-                ],
-              )
-            ],
-          );
+                  ],
+                ),
+                Row(
+                  spacing: 10,
+                  children: [
+                    Visibility(
+                      visible: model.coralValid,
+                      child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: model.getCoralColor(),
+                            padding: const EdgeInsets.all(20.0),
+                            fixedSize: const Size(200, 125),
+                            side:
+                                const BorderSide(width: 3, color: Colors.white),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30)),
+                          ),
+                          onPressed: () {
+                            print('onCoralButtonPressed');
+                            setState(() => model.onCoralButtonPressed());
+                          },
+                          child: Image.asset("assets/reef/coral.png")),
+                    ),
+                    Visibility(
+                      visible: model.shouldShowAlgaeButton(),
+                      child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: model.getAlgaeColor(),
+                            padding: const EdgeInsets.all(20.0),
+                            fixedSize: const Size(200, 125),
+                            side:
+                                const BorderSide(width: 3, color: Colors.white),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30)),
+                          ),
+                          onPressed: () {
+                            print('onAlgaeButtonPressed');
+                            setState(() => model.onAlgaeButtonPressed());
+                          },
+                          child: Image.asset("assets/reef/algae.png")),
+                    ),
+                    Visibility(
+                      visible: model.coralAndAlgaeValid,
+                      child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: model.getCoralAndAlgaeColor(),
+                            padding: const EdgeInsets.all(20.0),
+                            fixedSize: const Size(200, 125),
+                            side:
+                                const BorderSide(width: 3, color: Colors.white),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30)),
+                          ),
+                          onPressed: () {
+                            print('onCoralAndAlgaeButtonPressed');
+                            setState(
+                                () => model.onCoralAndAlgaeButtonPressed());
+                          },
+                          child:
+                              Image.asset("assets/reef/coral_and_algae.png")),
+                    ),
+                    const Spacer(),
+                    ElevatedButton(
+                        // GO button
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: model.getGoButtonColor(),
+                          padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+                          minimumSize: const Size(20, 125),
+                          side: const BorderSide(width: 3, color: Colors.white),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30)),
+                        ),
+                        onPressed: () {
+                          setState(() => model.onGoButtonPressed());
+                        },
+                        child: Text(
+                          model.getGoButtonLabel(),
+                          style: const TextStyle(
+                            fontSize: 70,
+                            fontFamily: 'Arial Rounded MT Bold',
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )),
+                  ],
+                ),
+                Row(
+                  spacing: 10,
+                  children: [
+                    Visibility(
+                      visible: model.shouldShowReefAlgae(),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: model.reefAlgaeSelected
+                              ? selectedColor
+                              : unselectedColor,
+                          borderRadius:
+                              const BorderRadius.all(Radius.circular(15)),
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        constraints: BoxConstraints.tight(const Size(200, 500)),
+                        child: ImageMap(
+                            image: Image.asset("assets/reef/reef_algae.png",
+                                fit: BoxFit.scaleDown),
+                            onTap: (region) {
+                              setState(() => model.onReefAlgaePressed());
+                            },
+                            regions: [
+                              ImageMapRegion.fromRect(
+                                rect: Rect.fromPoints(
+                                    const Offset(0, 0), const Offset(264, 586)),
+                                color: unselectedColor,
+                                title: 'reef_algae',
+                              )
+                            ]),
+                      ),
+                    ),
+                    Column(
+                      spacing: 10,
+                      children: [
+                        Visibility(
+                          visible: model.shouldShowFloorAlgae(),
+                          child: Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: model.floorAlgaeSelected
+                                  ? selectedColor
+                                  : unselectedColor,
+                              borderRadius:
+                                  const BorderRadius.all(Radius.circular(15)),
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            constraints: BoxConstraints.tight(Size(200, 200)),
+                            child: Center(
+                              child: ImageMap(
+                                  image: Image.asset(
+                                      "assets/reef/algae_floor.png",
+                                      fit: BoxFit.scaleDown),
+                                  onTap: (region) {
+                                    setState(() => model.onAlgaeFloorPressed());
+                                  },
+                                  regions: [
+                                    ImageMapRegion.fromRect(
+                                      rect: Rect.fromPoints(const Offset(0, 0),
+                                          const Offset(369, 297)),
+                                      color: unselectedColor,
+                                      title: 'algae_floor',
+                                    )
+                                  ]),
+                            ),
+                          ),
+                        ),
+                        Visibility(
+                          visible: model.shouldShowAlgaeOnCoral(),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: model.algaeOnCoralSelected
+                                  ? selectedColor
+                                  : unselectedColor,
+                              borderRadius:
+                                  const BorderRadius.all(Radius.circular(15)),
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            constraints: BoxConstraints.tight(Size(200, 200)),
+                            child: ImageMap(
+                                image: Image.asset(
+                                    "assets/reef/algae_on_coral.png",
+                                    fit: BoxFit.scaleDown),
+                                onTap: (region) {
+                                  setState(() => model.onAlgaeOnCoralPressed());
+                                },
+                                regions: [
+                                  ImageMapRegion.fromRect(
+                                    rect: Rect.fromPoints(const Offset(0, 0),
+                                        const Offset(253, 386)),
+                                    color: unselectedColor,
+                                    title: 'algae_on_coral',
+                                  )
+                                ]),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Visibility(
+                      visible: model.shouldShowReef(),
+                      child: Container(
+                        constraints: BoxConstraints.tight(Size(500, 500)),
+                        child: ImageMap(
+                            image: Image.asset("assets/reef/reef.png",
+                                fit: BoxFit.scaleDown),
+                            onTap: (region) {
+                              setState(() => model.onReefSegmentPressed(
+                                  int.parse(region.title!)));
+                            },
+                            regions: [
+                              ImageMapRegion.fromPoly(
+                                points: [
+                                  const Offset(305, 281),
+                                  const Offset(156, 539),
+                                  const Offset(454, 539),
+                                ],
+                                color: model.selectedReefSegment == 1
+                                    ? selectedColor
+                                    : unselectedColor,
+                                title: '1',
+                              ),
+                              ImageMapRegion.fromPoly(
+                                points: [
+                                  const Offset(305, 281),
+                                  const Offset(454, 539),
+                                  const Offset(604, 281),
+                                ],
+                                color: model.selectedReefSegment == 2
+                                    ? selectedColor
+                                    : unselectedColor,
+                                title: '2',
+                              ),
+                              ImageMapRegion.fromPoly(
+                                points: [
+                                  const Offset(305, 281),
+                                  const Offset(604, 281),
+                                  const Offset(455, 22),
+                                ],
+                                color: model.selectedReefSegment == 3
+                                    ? selectedColor
+                                    : unselectedColor,
+                                title: '3',
+                              ),
+                              ImageMapRegion.fromPoly(
+                                points: [
+                                  const Offset(305, 281),
+                                  const Offset(455, 22),
+                                  const Offset(157, 22),
+                                ],
+                                color: model.selectedReefSegment == 4
+                                    ? selectedColor
+                                    : unselectedColor,
+                                title: '4',
+                              ),
+                              ImageMapRegion.fromPoly(
+                                points: [
+                                  const Offset(305, 281),
+                                  const Offset(157, 22),
+                                  const Offset(6, 281),
+                                ],
+                                color: model.selectedReefSegment == 5
+                                    ? selectedColor
+                                    : unselectedColor,
+                                title: '5',
+                              ),
+                              ImageMapRegion.fromPoly(
+                                points: [
+                                  const Offset(305, 281),
+                                  const Offset(6, 281),
+                                  const Offset(156, 538),
+                                ],
+                                color: model.selectedReefSegment == 6
+                                    ? selectedColor
+                                    : unselectedColor,
+                                title: '6',
+                              ),
+                            ]),
+                      ),
+                    ),
+                    Visibility(
+                      visible: model.shouldShowPipes(),
+                      child: Container(
+                        constraints: BoxConstraints.tight(Size(300, 500)),
+                        child: ImageMap(
+                            image: Image.asset("assets/reef/pipes.png"),
+                            onTap: (region) {
+                              setState(
+                                  () => model.onPipeSelected(region.title!));
+                            },
+                            regions: [
+                              ImageMapRegion.fromCircle(
+                                center: const Offset(116, 160),
+                                radius: 100,
+                                color: model.reefLocation == ReefLocation.L4_L
+                                    ? selectedColor
+                                    : unselectedColor,
+                                title: ReefLocation.L4_L.name,
+                              ),
+                              ImageMapRegion.fromCircle(
+                                center: const Offset(347, 160),
+                                radius: 100,
+                                color: model.reefLocation == ReefLocation.L4_R
+                                    ? selectedColor
+                                    : unselectedColor,
+                                title: ReefLocation.L4_R.name,
+                              ),
+                              ImageMapRegion.fromCircle(
+                                center: const Offset(127, 421),
+                                radius: 100,
+                                color: model.reefLocation == ReefLocation.L3_L
+                                    ? selectedColor
+                                    : unselectedColor,
+                                title: ReefLocation.L3_L.name,
+                              ),
+                              ImageMapRegion.fromCircle(
+                                center: const Offset(334, 421),
+                                radius: 100,
+                                color: model.reefLocation == ReefLocation.L3_R
+                                    ? selectedColor
+                                    : unselectedColor,
+                                title: ReefLocation.L3_R.name,
+                              ),
+                              ImageMapRegion.fromCircle(
+                                center: const Offset(130, 633),
+                                radius: 100,
+                                color: model.reefLocation == ReefLocation.L2_L
+                                    ? selectedColor
+                                    : unselectedColor,
+                                title: ReefLocation.L2_L.name,
+                              ),
+                              ImageMapRegion.fromCircle(
+                                center: const Offset(334, 633),
+                                radius: 100,
+                                color: model.reefLocation == ReefLocation.L2_R
+                                    ? selectedColor
+                                    : unselectedColor,
+                                title: ReefLocation.L2_R.name,
+                              ),
+                              ImageMapRegion.fromPoly(
+                                points: [
+                                  const Offset(110, 731),
+                                  const Offset(109, 748),
+                                  const Offset(76, 775),
+                                  const Offset(55, 777),
+                                  const Offset(55, 949),
+                                  const Offset(420, 949),
+                                  const Offset(421, 776),
+                                  const Offset(402, 776),
+                                  const Offset(366, 747),
+                                  const Offset(365, 730),
+                                ],
+                                color: model.reefLocation == ReefLocation.L1
+                                    ? selectedColor
+                                    : unselectedColor,
+                                title: ReefLocation.L1.name,
+                              ),
+                            ]),
+                      ),
+                    ),
+                    Visibility(
+                      visible: model.shouldShowCoralLoader(),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: selectedColor,
+                          borderRadius:
+                              const BorderRadius.all(Radius.circular(15)),
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        constraints: BoxConstraints.tight(const Size(400, 400)),
+                        child: Image.asset("assets/reef/coral_loader.png"),
+                      ),
+                    ),
+                    Visibility(
+                      visible: model.shouldShowProcessor(),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: model.processorSelected
+                              ? selectedColor
+                              : unselectedColor,
+                          borderRadius:
+                              const BorderRadius.all(Radius.circular(15)),
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        constraints: BoxConstraints.tight(const Size(400, 400)),
+                        child: ImageMap(
+                            image: Image.asset("assets/reef/processor.png"),
+                            onTap: (region) {
+                              setState(() => model.onDestSelected("processor"));
+                            },
+                            regions: [
+                              ImageMapRegion.fromRect(
+                                rect: Rect.fromPoints(
+                                    const Offset(0, 0), const Offset(613, 545)),
+                                color: unselectedColor,
+                                title: 'Processor',
+                              )
+                            ]),
+                      ),
+                    ),
+                    Visibility(
+                      visible: model.shouldShowBarge(),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: model.bargeSelected
+                              ? selectedColor
+                              : unselectedColor,
+                          borderRadius:
+                              const BorderRadius.all(Radius.circular(15)),
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        constraints: BoxConstraints.tight(const Size(400, 400)),
+                        child: ImageMap(
+                            image: Image.asset("assets/reef/barge.png"),
+                            onTap: (region) {
+                              setState(() => model.onDestSelected("barge"));
+                            },
+                            regions: [
+                              ImageMapRegion.fromRect(
+                                rect: Rect.fromPoints(
+                                    const Offset(0, 0), const Offset(555, 617)),
+                                color: unselectedColor,
+                                title: 'Barge',
+                              )
+                            ]),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          });
         });
-      }
-    );
   }
 }
