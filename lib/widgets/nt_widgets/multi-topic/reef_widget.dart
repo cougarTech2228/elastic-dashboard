@@ -1,6 +1,7 @@
 import 'package:dot_cast/dot_cast.dart';
 import 'package:elastic_dashboard/services/nt4_client.dart';
 import 'package:elastic_dashboard/widgets/nt_widgets/nt_widget.dart';
+import 'package:elastic_dashboard/widgets/nt_widgets/single_topic/toggle_switch.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_map/flutter_image_map.dart';
 import 'package:provider/provider.dart';
@@ -23,6 +24,7 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
   late NT4Subscription executeCommandSubscription;
   late NT4Topic executeCommandTopic;
 
+  late NT4Topic autoAlignTopic;
   late NT4Topic modeTopic;
   late NT4Topic destTopic;
   late NT4Topic reefSegmentTopic;
@@ -46,6 +48,8 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
   bool floorAlgaeSelected = false;
   bool reefAlgaeSelected = false;
   bool algaeOnCoralSelected = false;
+
+  bool autoAlignEnabled = true;
 
   String loadPieceText = "Load Piece";
   String selectDestinationText = "Select Destination";
@@ -83,6 +87,7 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
     executeCommandSubscription =
         ntConnection.subscribe(executeCommandTopic.name, super.period);
 
+    autoAlignTopic = ntConnection.publishNewTopic('$topic/autoAlign', NT4TypeStr.kBool);
     modeTopic = ntConnection.publishNewTopic('$topic/mode', NT4TypeStr.kString);
     destTopic = ntConnection.publishNewTopic('$topic/dest', NT4TypeStr.kString);
     reefSegmentTopic =
@@ -339,9 +344,13 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
       dest = "processor";
     } else if (floorAlgaeSelected) {
       dest = "floorAlgae";
+    } else if (algaeOnCoralSelected) {
+      dest = "algaeOnCoral";
     } else {
       dest = "reef";
     }
+
+    ntConnection.updateDataFromTopic(autoAlignTopic, autoAlignEnabled);
     ntConnection.updateDataFromTopic(destTopic, dest);
     ntConnection.updateDataFromTopic(modeTopic, mode.name);
     ntConnection.updateDataFromTopic(reefSegmentTopic, selectedReefSegment);
@@ -386,7 +395,12 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
   }
 
   bool shouldShowCoralLoader() {
-    return !loaded && mode == Mode.coral;
+    bool shouldShow = !loaded && mode == Mode.coral;
+    if (shouldShow) {
+      // this is the only valid option, mark it as selected
+      coralLoaderSelected = true;
+    }
+    return shouldShow;
   }
 
   bool shouldShowReef() {
@@ -436,6 +450,7 @@ class ReefWidget extends NTWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    const Spacer(),
                     Center(
                       child: Text(
                         model.instructionText,
@@ -446,7 +461,20 @@ class ReefWidget extends NTWidget {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                    )
+                    ),
+                    const Spacer(),
+                    Column(
+                      children: [
+                        Switch(
+                          value: model.autoAlignEnabled,
+                          onChanged: (bool value) {
+                            setState(() => model.autoAlignEnabled = !model.autoAlignEnabled);
+                          },
+                        ),
+                        const Text("Auto Align Enabled"
+                        )
+                      ],
+                    ),
                   ],
                 ),
                 Row(
