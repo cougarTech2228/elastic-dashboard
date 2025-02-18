@@ -85,7 +85,7 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
     executeCommandTopic =
         ntConnection.publishNewTopic('$topic/executeCommand', NT4TypeStr.kBool);
     executeCommandSubscription =
-        ntConnection.subscribe(executeCommandTopic.name, super.period);
+        ntConnection.subscribeAll(executeCommandTopic.name, super.period);
 
     autoAlignTopic = ntConnection.publishNewTopic('$topic/autoAlign', NT4TypeStr.kBool);
     modeTopic = ntConnection.publishNewTopic('$topic/mode', NT4TypeStr.kString);
@@ -360,6 +360,12 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
         executeCommandTopic, !isCommandExecuting());
   }
 
+  void onFireButtonPressed() {
+    ntConnection.updateDataFromTopic(executeCommandTopic, false);
+    ntConnection.updateDataFromTopic(modeTopic, "fire");
+    ntConnection.updateDataFromTopic(executeCommandTopic, true);
+  }
+
   void onReefAlgaePressed() {
     // pickup an algae from the reef
     deselectAllDest();
@@ -537,6 +543,31 @@ class ReefWidget extends NTWidget {
                               Image.asset("assets/reef/coral_and_algae.png")),
                     ),
                     const Spacer(),
+                    Visibility(
+                      visible: model.loaded,
+                      child: ElevatedButton(
+                          // Fire button
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange[400],
+                            padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+                            minimumSize: const Size(20, 125),
+                            side: const BorderSide(width: 3, color: Colors.white),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30)),
+                          ),
+                          onPressed: () {
+                            setState(() => model.onFireButtonPressed());
+                          },
+                          child: const Text(
+                            "Fire!",
+                            style: TextStyle(
+                              fontSize: 70,
+                              fontFamily: 'Arial Rounded MT Bold',
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          )),
+                    ),
                     ElevatedButton(
                         // GO button
                         style: ElevatedButton.styleFrom(
