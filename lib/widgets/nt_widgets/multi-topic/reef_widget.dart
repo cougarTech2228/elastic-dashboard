@@ -1,16 +1,21 @@
+import 'dart:math';
+
 import 'package:dot_cast/dot_cast.dart';
 import 'package:elastic_dashboard/services/nt4_client.dart';
 import 'package:elastic_dashboard/widgets/nt_widgets/nt_widget.dart';
-import 'package:elastic_dashboard/widgets/nt_widgets/single_topic/toggle_switch.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_map/flutter_image_map.dart';
+import 'package:geekyants_flutter_gauges/geekyants_flutter_gauges.dart';
 import 'package:provider/provider.dart';
+
+import '../single_topic/radial_gauge.dart';
 
 enum Mode {
   unknown,
   algae,
   coral,
   coralAndAlgae,
+  cage,
 }
 
 enum ReefLocation { unknown, L1, L2_L, L2_R, L3_L, L3_R, L4_L, L4_R }
@@ -22,6 +27,11 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
   late NT4Subscription algaeLoadedSubscription;
   late NT4Subscription coralLoadedSubscription;
   late NT4Subscription executeCommandSubscription;
+  late NT4Subscription climberAngleSubscription;
+  late NT4Subscription climberAngleMinSubscription;
+  late NT4Subscription climberAngleMaxSubscription;
+  late NT4Subscription climberStateSubscription;
+  late NT4Subscription climberLockSubscription;
   late NT4Topic executeCommandTopic;
 
   late NT4Topic autoAlignTopic;
@@ -29,12 +39,18 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
   late NT4Topic destTopic;
   late NT4Topic reefSegmentTopic;
   late NT4Topic reefPostTopic;
+  late NT4Topic climberAngleTopic;
 
   @override
   List<NT4Subscription> get subscriptions => [
         algaeLoadedSubscription,
         coralLoadedSubscription,
         executeCommandSubscription,
+        climberAngleSubscription,
+        climberStateSubscription,
+        climberAngleMinSubscription,
+        climberAngleMaxSubscription,
+        climberLockSubscription,
       ];
 
   int selectedReefSegment = 0;
@@ -48,6 +64,7 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
   bool floorAlgaeSelected = false;
   bool reefAlgaeSelected = false;
   bool algaeOnCoralSelected = false;
+  bool cageSelected = false;
 
   bool autoAlignEnabled = true;
 
@@ -73,8 +90,9 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
   @override
   void init() {
     initSubscriptions();
-
     super.init();
+
+    setAutoAlign(true);
   }
 
   void initSubscriptions() {
@@ -86,6 +104,11 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
         ntConnection.publishNewTopic('$topic/executeCommand', NT4TypeStr.kBool);
     executeCommandSubscription =
         ntConnection.subscribeAll(executeCommandTopic.name, super.period);
+    climberAngleSubscription = ntConnection.subscribe('$topic/climberAngle', super.period);
+    climberStateSubscription = ntConnection.subscribe('$topic/climberState', super.period);
+    climberAngleMinSubscription = ntConnection.subscribe('$topic/climberAngleMin', super.period);
+    climberAngleMaxSubscription = ntConnection.subscribe('$topic/climberAngleMax', super.period);
+    climberLockSubscription = ntConnection.subscribe('$topic/climberLocked', super.period);
 
     autoAlignTopic = ntConnection.publishNewTopic('$topic/autoAlign', NT4TypeStr.kBool);
     modeTopic = ntConnection.publishNewTopic('$topic/mode', NT4TypeStr.kString);
@@ -121,6 +144,15 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
     return mode == Mode.coral ? Colors.green : Colors.black;
   }
 
+  Color getCageColor() {
+    return mode == Mode.cage ? Colors.green : Colors.black;
+  }
+
+  void setAutoAlign(bool enabled){
+    autoAlignEnabled = enabled;
+    ntConnection.updateDataFromTopic(autoAlignTopic, enabled);
+  }
+
   void onCoralButtonPressed() {
     print('onCoralButtonPressed');
     mode = Mode.coral;
@@ -146,6 +178,35 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
     _validateSelection();
   }
 
+  Color getClimberExtendColor() {
+    if (isClimberExtending()) {
+      return Colors.green;
+    } else {
+      return Colors.black;
+    }
+  }
+
+  Color getClimberRetractColor() {
+    if (isClimberRetracting()) {
+      return Colors.green;
+    } else {
+      return Colors.black;
+    }
+  }
+
+  void onClimberExtendButtonPressed() {
+    ntConnection.updateDataFromTopic(modeTopic, "${mode.name}-extend");
+    ntConnection.updateDataFromTopic(executeCommandTopic, true);
+  }
+  void onClimberRetractButtonPressed() {
+    ntConnection.updateDataFromTopic(modeTopic, "${mode.name}-retract");
+    ntConnection.updateDataFromTopic(executeCommandTopic, true);
+  }
+
+  void onCageButtonPressed() {
+    mode = Mode.cage;
+  }
+
   bool isCoralLoaded() {
     return tryCast(coralLoadedSubscription.value) == true;
   }
@@ -156,6 +217,64 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
 
   bool isCommandExecuting() {
     return tryCast(executeCommandSubscription.value) == true;
+  }
+
+  bool isClimberExtending() {
+    return tryCast(climberStateSubscription.value) == "EXTENDING";
+  }
+  bool isClimberRetracting() {
+    return tryCast(climberStateSubscription.value) == "RETRACTING";
+  }
+  bool isClimberDisabled() {
+    return tryCast(climberStateSubscription.value) == "DISABLED";
+  }
+
+  double getClimberAngle() {
+    Object? val = climberAngleSubscription.value;
+    if (val == null) {
+      return 0;
+    }
+    double dVal = val as double;
+    if (dVal < getClimberAngleMin()) {
+      dVal = getClimberAngleMin();
+    } else if (dVal > getClimberAngleMax()) {
+      dVal = getClimberAngleMax();
+    }
+    
+    return dVal;
+  }
+
+  double getClimberAngleMin() {
+    Object? val = climberAngleMinSubscription.value;
+    if (val == null) {
+      return 0;
+    }
+    return val as double;
+  }
+
+  double getClimberAngleMax() {
+    Object? val = climberAngleMaxSubscription.value;
+    if (val == null) {
+      return 0;
+    }
+    return val as double;
+  }
+
+  bool isClimberLocked(){
+    return tryCast(climberLockSubscription.value) == true;
+  }
+
+  void onClimberLockButtonPressed() {
+    if (isClimberLocked()) {
+      ntConnection.updateDataFromTopic(modeTopic, "${mode.name}-unlock");
+    } else {
+      ntConnection.updateDataFromTopic(modeTopic, "${mode.name}-lock");
+    }
+    ntConnection.updateDataFromTopic(executeCommandTopic, true);
+  }
+
+  String getLockText() {
+    return isClimberLocked() ? "Unlock" : "Lock";
   }
 
   bool _validateSelection() {
@@ -355,7 +474,7 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
     ntConnection.updateDataFromTopic(modeTopic, mode.name);
     ntConnection.updateDataFromTopic(reefSegmentTopic, selectedReefSegment);
     ntConnection.updateDataFromTopic(reefPostTopic, reefLocation.name);
-
+    ntConnection.updateDataFromTopic(autoAlignTopic, autoAlignEnabled);
     ntConnection.updateDataFromTopic(
         executeCommandTopic, !isCommandExecuting());
   }
@@ -433,6 +552,10 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
     }
     return loaded && mode == Mode.coral;
   }
+
+  bool shouldClimberControls() {
+    return mode == Mode.cage;
+  }
 }
 
 class ReefWidget extends NTWidget {
@@ -474,7 +597,7 @@ class ReefWidget extends NTWidget {
                         Switch(
                           value: model.autoAlignEnabled,
                           onChanged: (bool value) {
-                            setState(() => model.autoAlignEnabled = !model.autoAlignEnabled);
+                            setState(() => model.setAutoAlign(value));
                           },
                         ),
                         const Text("Auto Align Enabled"
@@ -483,7 +606,7 @@ class ReefWidget extends NTWidget {
                     ),
                   ],
                 ),
-                Row(
+                Row( // Top Button Row
                   spacing: 10,
                   children: [
                     Visibility(
@@ -542,6 +665,22 @@ class ReefWidget extends NTWidget {
                           child:
                               Image.asset("assets/reef/coral_and_algae.png")),
                     ),
+                    ElevatedButton( // Climber Button
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: model.getCageColor(),
+                        padding: const EdgeInsets.all(20.0),
+                        fixedSize: const Size(200, 125),
+                        side:
+                            const BorderSide(width: 3, color: Colors.white),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30)),
+                      ),
+                      onPressed: () {
+                        setState(
+                            () => model.onCageButtonPressed());
+                      },
+                      child:
+                          Image.asset("assets/reef/cage.png")),
                     const Spacer(),
                     Visibility(
                       visible: model.loaded,
@@ -592,7 +731,7 @@ class ReefWidget extends NTWidget {
                         )),
                   ],
                 ),
-                Row(
+                Row( // Main Content container
                   spacing: 10,
                   children: [
                     Visibility(
@@ -916,6 +1055,159 @@ class ReefWidget extends NTWidget {
                               )
                             ]),
                       ),
+                    ),
+                    Visibility(
+                      visible: model.shouldClimberControls(),
+                      child: Row(
+                        spacing: 10,
+                        children: [
+                          ElevatedButton( // Climber Extend Button
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: model.getClimberExtendColor(),
+                              padding: const EdgeInsets.all(20.0),
+                              fixedSize: const Size(250, 250),
+                              side:
+                                  const BorderSide(width: 3, color: Colors.white),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30)),
+                            ),
+                            onPressed: () {
+                              setState(
+                                  () => model.onClimberExtendButtonPressed());
+                            },
+                            child:
+                                Column(
+                                  children: [
+                                    Image.asset(
+                                      "assets/reef/climb_arrow.png",
+                                      width: 150,
+                                      height:150),
+                                    const Text("Extend",
+                                      style: TextStyle(
+                                      fontSize: 40,
+                                      fontFamily: 'Arial Rounded MT Bold',
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                )),
+                          ElevatedButton( // Climber Retract Button
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: model.getClimberRetractColor(),
+                              padding: const EdgeInsets.all(20.0),
+                              fixedSize: const Size(250, 250),
+                              side:
+                                  const BorderSide(width: 3, color: Colors.white),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30)),
+                            ),
+                            onPressed: () {
+                              setState(
+                                  () => model.onClimberRetractButtonPressed());
+                            },
+                            child:
+                              Column(
+                                children: [
+                                  Transform(
+                                    alignment: Alignment.center,
+                                    transform: Matrix4.identity()
+                                      ..scale(-1.0, 1.0)  // Flip horizontally
+                                      ..rotateZ(90 * 3.1415927 / 180), // Rotate 90 degrees,
+                                    child: Image.asset(
+                                      "assets/reef/climb_arrow.png",
+                                      width: 150,
+                                      height:150)
+                                  ),
+                                  const Text("Retract",
+                                    style: TextStyle(
+                                      fontSize: 40,
+                                      fontFamily: 'Arial Rounded MT Bold',
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              )
+                          ),
+                          ElevatedButton( // Climber Retract Button
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.black,
+                              padding: const EdgeInsets.all(20.0),
+                              fixedSize: const Size(250, 250),
+                              side:
+                                  const BorderSide(width: 3, color: Colors.white),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30)),
+                            ),
+                            onPressed: () {
+                              setState(
+                                  () => model.onClimberLockButtonPressed());
+                            },
+                            child:
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.lock,
+                                    size: 130),
+                                  Text(model.getLockText(),
+                                    style: const TextStyle(
+                                      fontSize: 40,
+                                      fontFamily: 'Arial Rounded MT Bold',
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              )
+                          ),
+                          Container(
+                            constraints: BoxConstraints.tight(const Size(250, 250)),
+                            child: Column(
+                              children: [
+                                SizedBox(
+                                  width: 200, // Set the desired width
+                                  height: 200, // Set the desired height
+                                  child:
+                                    RadialGauge(
+                                      track:  RadialTrack(
+                                        start: model.getClimberAngleMin(),
+                                        end: model.getClimberAngleMax(),
+                                        color: const Color.fromRGBO(97, 97, 97, 1),
+                                        trackStyle: TrackStyle(
+                                          primaryRulerColor: Colors.grey,
+                                          secondaryRulerColor: Colors.grey,
+                                          showPrimaryRulers: false,
+                                          showSecondaryRulers: false,
+                                          showLabel: false,
+                                          labelStyle: Theme.of(context).textTheme.bodySmall,
+                                          rulersOffset: -5,
+                                          labelOffset: -10,
+                                        ),
+                                      ),
+                                      valueBar: [
+                                        RadialValueBar(
+                                          color: Theme.of(context).colorScheme.primaryContainer,
+                                          value: model.getClimberAngle(),
+                                          startPosition: model.getClimberAngleMin(),
+                                        ),
+                                      ],
+                                    ),
+                                ),
+          
+                                const Text("Climber Angle",
+                                    style: TextStyle(
+                                      fontSize: 30,
+                                      fontFamily: 'Arial Rounded MT Bold',
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      )
                     ),
                   ],
                 ),
