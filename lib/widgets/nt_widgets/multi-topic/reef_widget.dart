@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:dot_cast/dot_cast.dart';
 import 'package:elastic_dashboard/services/nt4_client.dart';
 import 'package:elastic_dashboard/widgets/nt_widgets/nt_widget.dart';
@@ -7,8 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_image_map/flutter_image_map.dart';
 import 'package:geekyants_flutter_gauges/geekyants_flutter_gauges.dart';
 import 'package:provider/provider.dart';
-
-import '../single_topic/radial_gauge.dart';
 
 enum Mode {
   unknown,
@@ -104,13 +100,19 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
         ntConnection.publishNewTopic('$topic/executeCommand', NT4TypeStr.kBool);
     executeCommandSubscription =
         ntConnection.subscribeAll(executeCommandTopic.name, super.period);
-    climberAngleSubscription = ntConnection.subscribe('$topic/climberAngle', super.period);
-    climberStateSubscription = ntConnection.subscribe('$topic/climberState', super.period);
-    climberAngleMinSubscription = ntConnection.subscribe('$topic/climberAngleMin', super.period);
-    climberAngleMaxSubscription = ntConnection.subscribe('$topic/climberAngleMax', super.period);
-    climberLockSubscription = ntConnection.subscribe('$topic/climberLocked', super.period);
+    climberAngleSubscription =
+        ntConnection.subscribe('$topic/climberAngle', super.period);
+    climberStateSubscription =
+        ntConnection.subscribe('$topic/climberState', super.period);
+    climberAngleMinSubscription =
+        ntConnection.subscribe('$topic/climberAngleMin', super.period);
+    climberAngleMaxSubscription =
+        ntConnection.subscribe('$topic/climberAngleMax', super.period);
+    climberLockSubscription =
+        ntConnection.subscribe('$topic/climberLocked', super.period);
 
-    autoAlignTopic = ntConnection.publishNewTopic('$topic/autoAlign', NT4TypeStr.kBool);
+    autoAlignTopic =
+        ntConnection.publishNewTopic('$topic/autoAlign', NT4TypeStr.kBool);
     modeTopic = ntConnection.publishNewTopic('$topic/mode', NT4TypeStr.kString);
     destTopic = ntConnection.publishNewTopic('$topic/dest', NT4TypeStr.kString);
     reefSegmentTopic =
@@ -148,7 +150,7 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
     return mode == Mode.cage ? Colors.green : Colors.black;
   }
 
-  void setAutoAlign(bool enabled){
+  void setAutoAlign(bool enabled) {
     autoAlignEnabled = enabled;
     ntConnection.updateDataFromTopic(autoAlignTopic, enabled);
   }
@@ -198,6 +200,7 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
     ntConnection.updateDataFromTopic(modeTopic, "${mode.name}-extend");
     ntConnection.updateDataFromTopic(executeCommandTopic, true);
   }
+
   void onClimberRetractButtonPressed() {
     ntConnection.updateDataFromTopic(modeTopic, "${mode.name}-retract");
     ntConnection.updateDataFromTopic(executeCommandTopic, true);
@@ -222,9 +225,11 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
   bool isClimberExtending() {
     return tryCast(climberStateSubscription.value) == "EXTENDING";
   }
+
   bool isClimberRetracting() {
     return tryCast(climberStateSubscription.value) == "RETRACTING";
   }
+
   bool isClimberDisabled() {
     return tryCast(climberStateSubscription.value) == "DISABLED";
   }
@@ -240,7 +245,7 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
     } else if (dVal > getClimberAngleMax()) {
       dVal = getClimberAngleMax();
     }
-    
+
     return dVal;
   }
 
@@ -260,7 +265,7 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
     return val as double;
   }
 
-  bool isClimberLocked(){
+  bool isClimberLocked() {
     return tryCast(climberLockSubscription.value) == true;
   }
 
@@ -600,620 +605,642 @@ class ReefWidget extends NTWidget {
                             setState(() => model.setAutoAlign(value));
                           },
                         ),
-                        const Text("Auto Align Enabled"
-                        )
+                        const Text("Auto Align Enabled")
                       ],
                     ),
                   ],
                 ),
-                Row( // Top Button Row
+                Row(
+                  // Top Button Row
                   spacing: 10,
                   children: [
-                    Visibility(
-                      visible: model.coralValid,
-                      child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: model.getCoralColor(),
-                            padding: const EdgeInsets.all(20.0),
-                            fixedSize: const Size(200, 125),
-                            side:
-                                const BorderSide(width: 3, color: Colors.white),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30)),
-                          ),
-                          onPressed: () {
-                            print('onCoralButtonPressed');
-                            setState(() => model.onCoralButtonPressed());
-                          },
-                          child: Image.asset("assets/reef/coral.png")),
-                    ),
-                    Visibility(
-                      visible: model.shouldShowAlgaeButton(),
-                      child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: model.getAlgaeColor(),
-                            padding: const EdgeInsets.all(20.0),
-                            fixedSize: const Size(200, 125),
-                            side:
-                                const BorderSide(width: 3, color: Colors.white),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30)),
-                          ),
-                          onPressed: () {
-                            print('onAlgaeButtonPressed');
-                            setState(() => model.onAlgaeButtonPressed());
-                          },
-                          child: Image.asset("assets/reef/algae.png")),
-                    ),
-                    Visibility(
-                      visible: model.coralAndAlgaeValid,
-                      child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: model.getCoralAndAlgaeColor(),
-                            padding: const EdgeInsets.all(20.0),
-                            fixedSize: const Size(200, 125),
-                            side:
-                                const BorderSide(width: 3, color: Colors.white),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30)),
-                          ),
-                          onPressed: () {
-                            print('onCoralAndAlgaeButtonPressed');
-                            setState(
-                                () => model.onCoralAndAlgaeButtonPressed());
-                          },
-                          child:
-                              Image.asset("assets/reef/coral_and_algae.png")),
-                    ),
-                    ElevatedButton( // Climber Button
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: model.getCageColor(),
-                        padding: const EdgeInsets.all(20.0),
-                        fixedSize: const Size(200, 125),
-                        side:
-                            const BorderSide(width: 3, color: Colors.white),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30)),
-                      ),
-                      onPressed: () {
-                        setState(
-                            () => model.onCageButtonPressed());
-                      },
-                      child:
-                          Image.asset("assets/reef/cage.png")),
+                    coralButton(model, setState),
+                    algaeButton(model, setState),
+                    coralAndAlgaeButton(model, setState),
+                    cageButton(model, setState),
                     const Spacer(),
-                    Visibility(
-                      visible: model.loaded,
-                      child: ElevatedButton(
-                          // Fire button
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange[400],
-                            padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
-                            minimumSize: const Size(20, 125),
-                            side: const BorderSide(width: 3, color: Colors.white),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30)),
-                          ),
-                          onPressed: () {
-                            setState(() => model.onFireButtonPressed());
-                          },
-                          child: const Text(
-                            "Fire!",
-                            style: TextStyle(
-                              fontSize: 70,
-                              fontFamily: 'Arial Rounded MT Bold',
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          )),
-                    ),
-                    ElevatedButton(
-                        // GO button
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: model.getGoButtonColor(),
-                          padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
-                          minimumSize: const Size(20, 125),
-                          side: const BorderSide(width: 3, color: Colors.white),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30)),
-                        ),
-                        onPressed: () {
-                          setState(() => model.onGoButtonPressed());
-                        },
-                        child: Text(
-                          model.getGoButtonLabel(),
-                          style: const TextStyle(
-                            fontSize: 70,
-                            fontFamily: 'Arial Rounded MT Bold',
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        )),
+                    fireButton(model, setState),
+                    goButton(model, setState),
                   ],
                 ),
-                Row( // Main Content container
+                Row(
+                  // Main Content container
                   spacing: 10,
                   children: [
-                    Visibility(
-                      visible: model.shouldShowReefAlgae(),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: model.reefAlgaeSelected
-                              ? selectedColor
-                              : unselectedColor,
-                          borderRadius:
-                              const BorderRadius.all(Radius.circular(15)),
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        constraints: BoxConstraints.tight(const Size(200, 500)),
-                        child: ImageMap(
-                            image: Image.asset("assets/reef/reef_algae.png",
-                                fit: BoxFit.scaleDown),
-                            onTap: (region) {
-                              setState(() => model.onReefAlgaePressed());
-                            },
-                            regions: [
-                              ImageMapRegion.fromRect(
-                                rect: Rect.fromPoints(
-                                    const Offset(0, 0), const Offset(264, 586)),
-                                color: unselectedColor,
-                                title: 'reef_algae',
-                              )
-                            ]),
-                      ),
-                    ),
+                    reefAlgae(model, setState),
                     Column(
                       spacing: 10,
                       children: [
-                        Visibility(
-                          visible: model.shouldShowFloorAlgae(),
-                          child: Container(
-                            padding: const EdgeInsets.all(7),
-                            decoration: BoxDecoration(
-                              color: model.floorAlgaeSelected
-                                  ? selectedColor
-                                  : unselectedColor,
-                              borderRadius:
-                                  const BorderRadius.all(Radius.circular(15)),
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            constraints: BoxConstraints.tight(Size(200, 200)),
-                            child: Center(
-                              child: ImageMap(
-                                  image: Image.asset(
-                                      "assets/reef/algae_floor.png",
-                                      fit: BoxFit.scaleDown),
-                                  onTap: (region) {
-                                    setState(() => model.onAlgaeFloorPressed());
-                                  },
-                                  regions: [
-                                    ImageMapRegion.fromRect(
-                                      rect: Rect.fromPoints(const Offset(0, 0),
-                                          const Offset(369, 297)),
-                                      color: unselectedColor,
-                                      title: 'algae_floor',
-                                    )
-                                  ]),
-                            ),
-                          ),
-                        ),
-                        Visibility(
-                          visible: model.shouldShowAlgaeOnCoral(),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: model.algaeOnCoralSelected
-                                  ? selectedColor
-                                  : unselectedColor,
-                              borderRadius:
-                                  const BorderRadius.all(Radius.circular(15)),
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            constraints: BoxConstraints.tight(Size(200, 200)),
-                            child: ImageMap(
-                                image: Image.asset(
-                                    "assets/reef/algae_on_coral.png",
-                                    fit: BoxFit.scaleDown),
-                                onTap: (region) {
-                                  setState(() => model.onAlgaeOnCoralPressed());
-                                },
-                                regions: [
-                                  ImageMapRegion.fromRect(
-                                    rect: Rect.fromPoints(const Offset(0, 0),
-                                        const Offset(253, 386)),
-                                    color: unselectedColor,
-                                    title: 'algae_on_coral',
-                                  )
-                                ]),
-                          ),
-                        ),
+                        floorAlgae(model, setState),
+                        algaeOnCoral(model, setState),
                       ],
                     ),
-                    Visibility(
-                      visible: model.shouldShowReef(),
-                      child: Container(
-                        constraints: BoxConstraints.tight(Size(500, 500)),
-                        child: ImageMap(
-                            image: Image.asset("assets/reef/reef.png",
-                                fit: BoxFit.scaleDown),
-                            onTap: (region) {
-                              setState(() => model.onReefSegmentPressed(
-                                  int.parse(region.title!)));
-                            },
-                            regions: [
-                              ImageMapRegion.fromPoly(
-                                points: [
-                                  const Offset(305, 281),
-                                  const Offset(156, 539),
-                                  const Offset(454, 539),
-                                ],
-                                color: model.selectedReefSegment == 1
-                                    ? selectedColor
-                                    : unselectedColor,
-                                title: '1',
-                              ),
-                              ImageMapRegion.fromPoly(
-                                points: [
-                                  const Offset(305, 281),
-                                  const Offset(454, 539),
-                                  const Offset(604, 281),
-                                ],
-                                color: model.selectedReefSegment == 2
-                                    ? selectedColor
-                                    : unselectedColor,
-                                title: '2',
-                              ),
-                              ImageMapRegion.fromPoly(
-                                points: [
-                                  const Offset(305, 281),
-                                  const Offset(604, 281),
-                                  const Offset(455, 22),
-                                ],
-                                color: model.selectedReefSegment == 3
-                                    ? selectedColor
-                                    : unselectedColor,
-                                title: '3',
-                              ),
-                              ImageMapRegion.fromPoly(
-                                points: [
-                                  const Offset(305, 281),
-                                  const Offset(455, 22),
-                                  const Offset(157, 22),
-                                ],
-                                color: model.selectedReefSegment == 4
-                                    ? selectedColor
-                                    : unselectedColor,
-                                title: '4',
-                              ),
-                              ImageMapRegion.fromPoly(
-                                points: [
-                                  const Offset(305, 281),
-                                  const Offset(157, 22),
-                                  const Offset(6, 281),
-                                ],
-                                color: model.selectedReefSegment == 5
-                                    ? selectedColor
-                                    : unselectedColor,
-                                title: '5',
-                              ),
-                              ImageMapRegion.fromPoly(
-                                points: [
-                                  const Offset(305, 281),
-                                  const Offset(6, 281),
-                                  const Offset(156, 538),
-                                ],
-                                color: model.selectedReefSegment == 6
-                                    ? selectedColor
-                                    : unselectedColor,
-                                title: '6',
-                              ),
-                            ]),
-                      ),
-                    ),
-                    Visibility(
-                      visible: model.shouldShowPipes(),
-                      child: Container(
-                        constraints: BoxConstraints.tight(Size(300, 500)),
-                        child: ImageMap(
-                            image: Image.asset("assets/reef/pipes.png"),
-                            onTap: (region) {
-                              setState(
-                                  () => model.onPipeSelected(region.title!));
-                            },
-                            regions: [
-                              ImageMapRegion.fromCircle(
-                                center: const Offset(116, 160),
-                                radius: 100,
-                                color: model.reefLocation == ReefLocation.L4_L
-                                    ? selectedColor
-                                    : unselectedColor,
-                                title: ReefLocation.L4_L.name,
-                              ),
-                              ImageMapRegion.fromCircle(
-                                center: const Offset(347, 160),
-                                radius: 100,
-                                color: model.reefLocation == ReefLocation.L4_R
-                                    ? selectedColor
-                                    : unselectedColor,
-                                title: ReefLocation.L4_R.name,
-                              ),
-                              ImageMapRegion.fromCircle(
-                                center: const Offset(127, 421),
-                                radius: 100,
-                                color: model.reefLocation == ReefLocation.L3_L
-                                    ? selectedColor
-                                    : unselectedColor,
-                                title: ReefLocation.L3_L.name,
-                              ),
-                              ImageMapRegion.fromCircle(
-                                center: const Offset(334, 421),
-                                radius: 100,
-                                color: model.reefLocation == ReefLocation.L3_R
-                                    ? selectedColor
-                                    : unselectedColor,
-                                title: ReefLocation.L3_R.name,
-                              ),
-                              ImageMapRegion.fromCircle(
-                                center: const Offset(130, 633),
-                                radius: 100,
-                                color: model.reefLocation == ReefLocation.L2_L
-                                    ? selectedColor
-                                    : unselectedColor,
-                                title: ReefLocation.L2_L.name,
-                              ),
-                              ImageMapRegion.fromCircle(
-                                center: const Offset(334, 633),
-                                radius: 100,
-                                color: model.reefLocation == ReefLocation.L2_R
-                                    ? selectedColor
-                                    : unselectedColor,
-                                title: ReefLocation.L2_R.name,
-                              ),
-                              ImageMapRegion.fromPoly(
-                                points: [
-                                  const Offset(110, 731),
-                                  const Offset(109, 748),
-                                  const Offset(76, 775),
-                                  const Offset(55, 777),
-                                  const Offset(55, 949),
-                                  const Offset(420, 949),
-                                  const Offset(421, 776),
-                                  const Offset(402, 776),
-                                  const Offset(366, 747),
-                                  const Offset(365, 730),
-                                ],
-                                color: model.reefLocation == ReefLocation.L1
-                                    ? selectedColor
-                                    : unselectedColor,
-                                title: ReefLocation.L1.name,
-                              ),
-                            ]),
-                      ),
-                    ),
-                    Visibility(
-                      visible: model.shouldShowCoralLoader(),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: selectedColor,
-                          borderRadius:
-                              const BorderRadius.all(Radius.circular(15)),
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        constraints: BoxConstraints.tight(const Size(400, 400)),
-                        child: Image.asset("assets/reef/coral_loader.png"),
-                      ),
-                    ),
-                    Visibility(
-                      visible: model.shouldShowProcessor(),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: model.processorSelected
-                              ? selectedColor
-                              : unselectedColor,
-                          borderRadius:
-                              const BorderRadius.all(Radius.circular(15)),
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        constraints: BoxConstraints.tight(const Size(400, 400)),
-                        child: ImageMap(
-                            image: Image.asset("assets/reef/processor.png"),
-                            onTap: (region) {
-                              setState(() => model.onDestSelected("processor"));
-                            },
-                            regions: [
-                              ImageMapRegion.fromRect(
-                                rect: Rect.fromPoints(
-                                    const Offset(0, 0), const Offset(613, 545)),
-                                color: unselectedColor,
-                                title: 'Processor',
-                              )
-                            ]),
-                      ),
-                    ),
-                    Visibility(
-                      visible: model.shouldShowBarge(),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: model.bargeSelected
-                              ? selectedColor
-                              : unselectedColor,
-                          borderRadius:
-                              const BorderRadius.all(Radius.circular(15)),
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        constraints: BoxConstraints.tight(const Size(400, 400)),
-                        child: ImageMap(
-                            image: Image.asset("assets/reef/barge.png"),
-                            onTap: (region) {
-                              setState(() => model.onDestSelected("barge"));
-                            },
-                            regions: [
-                              ImageMapRegion.fromRect(
-                                rect: Rect.fromPoints(
-                                    const Offset(0, 0), const Offset(555, 617)),
-                                color: unselectedColor,
-                                title: 'Barge',
-                              )
-                            ]),
-                      ),
-                    ),
-                    Visibility(
-                      visible: model.shouldClimberControls(),
-                      child: Row(
-                        spacing: 10,
-                        children: [
-                          ElevatedButton( // Climber Extend Button
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: model.getClimberExtendColor(),
-                              padding: const EdgeInsets.all(20.0),
-                              fixedSize: const Size(250, 250),
-                              side:
-                                  const BorderSide(width: 3, color: Colors.white),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(30)),
-                            ),
-                            onPressed: () {
-                              setState(
-                                  () => model.onClimberExtendButtonPressed());
-                            },
-                            child:
-                                Column(
-                                  children: [
-                                    Image.asset(
-                                      "assets/reef/climb_arrow.png",
-                                      width: 150,
-                                      height:150),
-                                    const Text("Extend",
-                                      style: TextStyle(
-                                      fontSize: 40,
-                                      fontFamily: 'Arial Rounded MT Bold',
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                )),
-                          ElevatedButton( // Climber Retract Button
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: model.getClimberRetractColor(),
-                              padding: const EdgeInsets.all(20.0),
-                              fixedSize: const Size(250, 250),
-                              side:
-                                  const BorderSide(width: 3, color: Colors.white),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(30)),
-                            ),
-                            onPressed: () {
-                              setState(
-                                  () => model.onClimberRetractButtonPressed());
-                            },
-                            child:
-                              Column(
-                                children: [
-                                  Transform(
-                                    alignment: Alignment.center,
-                                    transform: Matrix4.identity()
-                                      ..scale(-1.0, 1.0)  // Flip horizontally
-                                      ..rotateZ(90 * 3.1415927 / 180), // Rotate 90 degrees,
-                                    child: Image.asset(
-                                      "assets/reef/climb_arrow.png",
-                                      width: 150,
-                                      height:150)
-                                  ),
-                                  const Text("Retract",
-                                    style: TextStyle(
-                                      fontSize: 40,
-                                      fontFamily: 'Arial Rounded MT Bold',
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              )
-                          ),
-                          ElevatedButton( // Climber Retract Button
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.black,
-                              padding: const EdgeInsets.all(20.0),
-                              fixedSize: const Size(250, 250),
-                              side:
-                                  const BorderSide(width: 3, color: Colors.white),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(30)),
-                            ),
-                            onPressed: () {
-                              setState(
-                                  () => model.onClimberLockButtonPressed());
-                            },
-                            child:
-                              Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(Icons.lock,
-                                    size: 130),
-                                  Text(model.getLockText(),
-                                    style: const TextStyle(
-                                      fontSize: 40,
-                                      fontFamily: 'Arial Rounded MT Bold',
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              )
-                          ),
-                          Container(
-                            constraints: BoxConstraints.tight(const Size(250, 250)),
-                            child: Column(
-                              children: [
-                                SizedBox(
-                                  width: 200, // Set the desired width
-                                  height: 200, // Set the desired height
-                                  child:
-                                    RadialGauge(
-                                      track:  RadialTrack(
-                                        start: model.getClimberAngleMin(),
-                                        end: model.getClimberAngleMax(),
-                                        color: const Color.fromRGBO(97, 97, 97, 1),
-                                        trackStyle: TrackStyle(
-                                          primaryRulerColor: Colors.grey,
-                                          secondaryRulerColor: Colors.grey,
-                                          showPrimaryRulers: false,
-                                          showSecondaryRulers: false,
-                                          showLabel: false,
-                                          labelStyle: Theme.of(context).textTheme.bodySmall,
-                                          rulersOffset: -5,
-                                          labelOffset: -10,
-                                        ),
-                                      ),
-                                      valueBar: [
-                                        RadialValueBar(
-                                          color: Theme.of(context).colorScheme.primaryContainer,
-                                          value: model.getClimberAngle(),
-                                          startPosition: model.getClimberAngleMin(),
-                                        ),
-                                      ],
-                                    ),
-                                ),
-          
-                                const Text("Climber Angle",
-                                    style: TextStyle(
-                                      fontSize: 30,
-                                      fontFamily: 'Arial Rounded MT Bold',
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      )
-                    ),
+                    reef(model, setState),
+                    pipes(model, setState),
+                    coralLoader(model),
+                    processor(model, setState),
+                    barge(model, setState),
+                    climberControls(model, setState, context),
                   ],
                 ),
               ],
             );
           });
         });
+  }
+
+  Widget climberControls(
+      ReefWidgetModel model, StateSetter setState, BuildContext context) {
+    return Visibility(
+        visible: model.shouldClimberControls(),
+        child: Row(
+          spacing: 10,
+          children: [
+            ElevatedButton(
+                // Climber Extend Button
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: model.getClimberExtendColor(),
+                  padding: const EdgeInsets.all(20.0),
+                  fixedSize: const Size(250, 250),
+                  side: const BorderSide(width: 3, color: Colors.white),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30)),
+                ),
+                onPressed: () {
+                  setState(() => model.onClimberExtendButtonPressed());
+                },
+                child: Column(
+                  children: [
+                    Image.asset("assets/reef/climb_arrow.png",
+                        width: 150, height: 150),
+                    const Text(
+                      "Extend",
+                      style: TextStyle(
+                        fontSize: 40,
+                        fontFamily: 'Arial Rounded MT Bold',
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                )),
+            ElevatedButton(
+                // Climber Retract Button
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: model.getClimberRetractColor(),
+                  padding: const EdgeInsets.all(20.0),
+                  fixedSize: const Size(250, 250),
+                  side: const BorderSide(width: 3, color: Colors.white),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30)),
+                ),
+                onPressed: () {
+                  setState(() => model.onClimberRetractButtonPressed());
+                },
+                child: Column(
+                  children: [
+                    Transform(
+                        alignment: Alignment.center,
+                        transform: Matrix4.identity()
+                          ..scale(-1.0, 1.0) // Flip horizontally
+                          ..rotateZ(90 * 3.1415927 / 180), // Rotate 90 degrees,
+                        child: Image.asset("assets/reef/climb_arrow.png",
+                            width: 150, height: 150)),
+                    const Text(
+                      "Retract",
+                      style: TextStyle(
+                        fontSize: 40,
+                        fontFamily: 'Arial Rounded MT Bold',
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                )),
+            ElevatedButton(
+                // Climber Retract Button
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  padding: const EdgeInsets.all(20.0),
+                  fixedSize: const Size(250, 250),
+                  side: const BorderSide(width: 3, color: Colors.white),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30)),
+                ),
+                onPressed: () {
+                  setState(() => model.onClimberLockButtonPressed());
+                },
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.lock, size: 130),
+                    Text(
+                      model.getLockText(),
+                      style: const TextStyle(
+                        fontSize: 40,
+                        fontFamily: 'Arial Rounded MT Bold',
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                )),
+            Container(
+              constraints: BoxConstraints.tight(const Size(250, 250)),
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: 200, // Set the desired width
+                    height: 200, // Set the desired height
+                    child: RadialGauge(
+                      track: RadialTrack(
+                        start: model.getClimberAngleMin(),
+                        end: model.getClimberAngleMax(),
+                        color: const Color.fromRGBO(97, 97, 97, 1),
+                        trackStyle: TrackStyle(
+                          primaryRulerColor: Colors.grey,
+                          secondaryRulerColor: Colors.grey,
+                          showPrimaryRulers: false,
+                          showSecondaryRulers: false,
+                          showLabel: false,
+                          labelStyle: Theme.of(context).textTheme.bodySmall,
+                          rulersOffset: -5,
+                          labelOffset: -10,
+                        ),
+                      ),
+                      valueBar: [
+                        RadialValueBar(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          value: model.getClimberAngle(),
+                          startPosition: model.getClimberAngleMin(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Text(
+                    "Climber Angle",
+                    style: TextStyle(
+                      fontSize: 30,
+                      fontFamily: 'Arial Rounded MT Bold',
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ));
+  }
+
+  Widget barge(ReefWidgetModel model, StateSetter setState) {
+    return Visibility(
+      visible: model.shouldShowBarge(),
+      child: Container(
+        decoration: BoxDecoration(
+          color: model.bargeSelected ? selectedColor : unselectedColor,
+          borderRadius: const BorderRadius.all(Radius.circular(15)),
+          border: Border.all(color: Colors.white, width: 2),
+        ),
+        constraints: BoxConstraints.tight(const Size(400, 400)),
+        child: ImageMap(
+            image: Image.asset("assets/reef/barge.png"),
+            onTap: (region) {
+              setState(() => model.onDestSelected("barge"));
+            },
+            regions: [
+              ImageMapRegion.fromRect(
+                rect:
+                    Rect.fromPoints(const Offset(0, 0), const Offset(555, 617)),
+                color: unselectedColor,
+                title: 'Barge',
+              )
+            ]),
+      ),
+    );
+  }
+
+  Widget processor(ReefWidgetModel model, StateSetter setState) {
+    return Visibility(
+      visible: model.shouldShowProcessor(),
+      child: Container(
+        decoration: BoxDecoration(
+          color: model.processorSelected ? selectedColor : unselectedColor,
+          borderRadius: const BorderRadius.all(Radius.circular(15)),
+          border: Border.all(color: Colors.white, width: 2),
+        ),
+        constraints: BoxConstraints.tight(const Size(400, 400)),
+        child: ImageMap(
+            image: Image.asset("assets/reef/processor.png"),
+            onTap: (region) {
+              setState(() => model.onDestSelected("processor"));
+            },
+            regions: [
+              ImageMapRegion.fromRect(
+                rect:
+                    Rect.fromPoints(const Offset(0, 0), const Offset(613, 545)),
+                color: unselectedColor,
+                title: 'Processor',
+              )
+            ]),
+      ),
+    );
+  }
+
+  Widget coralLoader(ReefWidgetModel model) {
+    return Visibility(
+      visible: model.shouldShowCoralLoader(),
+      child: Container(
+        decoration: BoxDecoration(
+          color: selectedColor,
+          borderRadius: const BorderRadius.all(Radius.circular(15)),
+          border: Border.all(color: Colors.white, width: 2),
+        ),
+        constraints: BoxConstraints.tight(const Size(400, 400)),
+        child: Image.asset("assets/reef/coral_loader.png"),
+      ),
+    );
+  }
+
+  Widget pipes(ReefWidgetModel model, StateSetter setState) {
+    return Visibility(
+      visible: model.shouldShowPipes(),
+      child: Container(
+        constraints: BoxConstraints.tight(Size(300, 500)),
+        child: ImageMap(
+            image: Image.asset("assets/reef/pipes.png"),
+            onTap: (region) {
+              setState(() => model.onPipeSelected(region.title!));
+            },
+            regions: [
+              ImageMapRegion.fromCircle(
+                center: const Offset(116, 160),
+                radius: 100,
+                color: model.reefLocation == ReefLocation.L4_L
+                    ? selectedColor
+                    : unselectedColor,
+                title: ReefLocation.L4_L.name,
+              ),
+              ImageMapRegion.fromCircle(
+                center: const Offset(347, 160),
+                radius: 100,
+                color: model.reefLocation == ReefLocation.L4_R
+                    ? selectedColor
+                    : unselectedColor,
+                title: ReefLocation.L4_R.name,
+              ),
+              ImageMapRegion.fromCircle(
+                center: const Offset(127, 421),
+                radius: 100,
+                color: model.reefLocation == ReefLocation.L3_L
+                    ? selectedColor
+                    : unselectedColor,
+                title: ReefLocation.L3_L.name,
+              ),
+              ImageMapRegion.fromCircle(
+                center: const Offset(334, 421),
+                radius: 100,
+                color: model.reefLocation == ReefLocation.L3_R
+                    ? selectedColor
+                    : unselectedColor,
+                title: ReefLocation.L3_R.name,
+              ),
+              ImageMapRegion.fromCircle(
+                center: const Offset(130, 633),
+                radius: 100,
+                color: model.reefLocation == ReefLocation.L2_L
+                    ? selectedColor
+                    : unselectedColor,
+                title: ReefLocation.L2_L.name,
+              ),
+              ImageMapRegion.fromCircle(
+                center: const Offset(334, 633),
+                radius: 100,
+                color: model.reefLocation == ReefLocation.L2_R
+                    ? selectedColor
+                    : unselectedColor,
+                title: ReefLocation.L2_R.name,
+              ),
+              ImageMapRegion.fromPoly(
+                points: [
+                  const Offset(110, 731),
+                  const Offset(109, 748),
+                  const Offset(76, 775),
+                  const Offset(55, 777),
+                  const Offset(55, 949),
+                  const Offset(420, 949),
+                  const Offset(421, 776),
+                  const Offset(402, 776),
+                  const Offset(366, 747),
+                  const Offset(365, 730),
+                ],
+                color: model.reefLocation == ReefLocation.L1
+                    ? selectedColor
+                    : unselectedColor,
+                title: ReefLocation.L1.name,
+              ),
+            ]),
+      ),
+    );
+  }
+
+  Widget reef(ReefWidgetModel model, StateSetter setState) {
+    return Visibility(
+      visible: model.shouldShowReef(),
+      child: Container(
+        constraints: BoxConstraints.tight(Size(500, 500)),
+        child: ImageMap(
+            image: Image.asset("assets/reef/reef.png", fit: BoxFit.scaleDown),
+            onTap: (region) {
+              setState(
+                  () => model.onReefSegmentPressed(int.parse(region.title!)));
+            },
+            regions: [
+              ImageMapRegion.fromPoly(
+                points: [
+                  const Offset(305, 281),
+                  const Offset(156, 539),
+                  const Offset(454, 539),
+                ],
+                color: model.selectedReefSegment == 1
+                    ? selectedColor
+                    : unselectedColor,
+                title: '1',
+              ),
+              ImageMapRegion.fromPoly(
+                points: [
+                  const Offset(305, 281),
+                  const Offset(454, 539),
+                  const Offset(604, 281),
+                ],
+                color: model.selectedReefSegment == 2
+                    ? selectedColor
+                    : unselectedColor,
+                title: '2',
+              ),
+              ImageMapRegion.fromPoly(
+                points: [
+                  const Offset(305, 281),
+                  const Offset(604, 281),
+                  const Offset(455, 22),
+                ],
+                color: model.selectedReefSegment == 3
+                    ? selectedColor
+                    : unselectedColor,
+                title: '3',
+              ),
+              ImageMapRegion.fromPoly(
+                points: [
+                  const Offset(305, 281),
+                  const Offset(455, 22),
+                  const Offset(157, 22),
+                ],
+                color: model.selectedReefSegment == 4
+                    ? selectedColor
+                    : unselectedColor,
+                title: '4',
+              ),
+              ImageMapRegion.fromPoly(
+                points: [
+                  const Offset(305, 281),
+                  const Offset(157, 22),
+                  const Offset(6, 281),
+                ],
+                color: model.selectedReefSegment == 5
+                    ? selectedColor
+                    : unselectedColor,
+                title: '5',
+              ),
+              ImageMapRegion.fromPoly(
+                points: [
+                  const Offset(305, 281),
+                  const Offset(6, 281),
+                  const Offset(156, 538),
+                ],
+                color: model.selectedReefSegment == 6
+                    ? selectedColor
+                    : unselectedColor,
+                title: '6',
+              ),
+            ]),
+      ),
+    );
+  }
+
+  Widget algaeOnCoral(ReefWidgetModel model, StateSetter setState) {
+    return Visibility(
+      visible: model.shouldShowAlgaeOnCoral(),
+      child: Container(
+        decoration: BoxDecoration(
+          color: model.algaeOnCoralSelected ? selectedColor : unselectedColor,
+          borderRadius: const BorderRadius.all(Radius.circular(15)),
+          border: Border.all(color: Colors.white, width: 2),
+        ),
+        constraints: BoxConstraints.tight(Size(200, 200)),
+        child: ImageMap(
+            image: Image.asset("assets/reef/algae_on_coral.png",
+                fit: BoxFit.scaleDown),
+            onTap: (region) {
+              setState(() => model.onAlgaeOnCoralPressed());
+            },
+            regions: [
+              ImageMapRegion.fromRect(
+                rect:
+                    Rect.fromPoints(const Offset(0, 0), const Offset(253, 386)),
+                color: unselectedColor,
+                title: 'algae_on_coral',
+              )
+            ]),
+      ),
+    );
+  }
+
+  Widget floorAlgae(ReefWidgetModel model, StateSetter setState) {
+    return Visibility(
+      visible: model.shouldShowFloorAlgae(),
+      child: Container(
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          color: model.floorAlgaeSelected ? selectedColor : unselectedColor,
+          borderRadius: const BorderRadius.all(Radius.circular(15)),
+          border: Border.all(color: Colors.white, width: 2),
+        ),
+        constraints: BoxConstraints.tight(Size(200, 200)),
+        child: Center(
+          child: ImageMap(
+              image: Image.asset("assets/reef/algae_floor.png",
+                  fit: BoxFit.scaleDown),
+              onTap: (region) {
+                setState(() => model.onAlgaeFloorPressed());
+              },
+              regions: [
+                ImageMapRegion.fromRect(
+                  rect: Rect.fromPoints(
+                      const Offset(0, 0), const Offset(369, 297)),
+                  color: unselectedColor,
+                  title: 'algae_floor',
+                )
+              ]),
+        ),
+      ),
+    );
+  }
+
+  Widget reefAlgae(ReefWidgetModel model, StateSetter setState) {
+    return Visibility(
+      visible: model.shouldShowReefAlgae(),
+      child: Container(
+        decoration: BoxDecoration(
+          color: model.reefAlgaeSelected ? selectedColor : unselectedColor,
+          borderRadius: const BorderRadius.all(Radius.circular(15)),
+          border: Border.all(color: Colors.white, width: 2),
+        ),
+        constraints: BoxConstraints.tight(const Size(200, 500)),
+        child: ImageMap(
+            image: Image.asset("assets/reef/reef_algae.png",
+                fit: BoxFit.scaleDown),
+            onTap: (region) {
+              setState(() => model.onReefAlgaePressed());
+            },
+            regions: [
+              ImageMapRegion.fromRect(
+                rect:
+                    Rect.fromPoints(const Offset(0, 0), const Offset(264, 586)),
+                color: unselectedColor,
+                title: 'reef_algae',
+              )
+            ]),
+      ),
+    );
+  }
+
+  Widget goButton(ReefWidgetModel model, StateSetter setState) {
+    return ElevatedButton(
+        // GO button
+        style: ElevatedButton.styleFrom(
+          backgroundColor: model.getGoButtonColor(),
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+          minimumSize: const Size(20, 125),
+          side: const BorderSide(width: 3, color: Colors.white),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        ),
+        onPressed: () {
+          setState(() => model.onGoButtonPressed());
+        },
+        child: Text(
+          model.getGoButtonLabel(),
+          style: const TextStyle(
+            fontSize: 70,
+            fontFamily: 'Arial Rounded MT Bold',
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ));
+  }
+
+  Widget coralButton(ReefWidgetModel model, StateSetter setState) {
+    return Visibility(
+      visible: model.coralValid,
+      child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: model.getCoralColor(),
+            padding: const EdgeInsets.all(20.0),
+            fixedSize: const Size(200, 125),
+            side: const BorderSide(width: 3, color: Colors.white),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+          ),
+          onPressed: () {
+            print('onCoralButtonPressed');
+            setState(() => model.onCoralButtonPressed());
+          },
+          child: Image.asset("assets/reef/coral.png")),
+    );
+  }
+
+  Widget algaeButton(ReefWidgetModel model, StateSetter setState) {
+    return Visibility(
+      visible: model.shouldShowAlgaeButton(),
+      child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: model.getAlgaeColor(),
+            padding: const EdgeInsets.all(20.0),
+            fixedSize: const Size(200, 125),
+            side: const BorderSide(width: 3, color: Colors.white),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+          ),
+          onPressed: () {
+            print('onAlgaeButtonPressed');
+            setState(() => model.onAlgaeButtonPressed());
+          },
+          child: Image.asset("assets/reef/algae.png")),
+    );
+  }
+
+  Widget coralAndAlgaeButton(ReefWidgetModel model, StateSetter setState) {
+    return Visibility(
+      visible: model.coralAndAlgaeValid,
+      child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: model.getCoralAndAlgaeColor(),
+            padding: const EdgeInsets.all(20.0),
+            fixedSize: const Size(200, 125),
+            side: const BorderSide(width: 3, color: Colors.white),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+          ),
+          onPressed: () {
+            print('onCoralAndAlgaeButtonPressed');
+            setState(() => model.onCoralAndAlgaeButtonPressed());
+          },
+          child: Image.asset("assets/reef/coral_and_algae.png")),
+    );
+  }
+
+  Widget cageButton(ReefWidgetModel model, StateSetter setState) {
+    return ElevatedButton(
+        // Climber Button
+        style: ElevatedButton.styleFrom(
+          backgroundColor: model.getCageColor(),
+          padding: const EdgeInsets.all(20.0),
+          fixedSize: const Size(200, 125),
+          side: const BorderSide(width: 3, color: Colors.white),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        ),
+        onPressed: () {
+          setState(() => model.onCageButtonPressed());
+        },
+        child: Image.asset("assets/reef/cage.png"));
+  }
+
+  Widget fireButton(ReefWidgetModel model, StateSetter setState) {
+    return Visibility(
+      visible: model.loaded,
+      child: ElevatedButton(
+          // Fire button
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange[400],
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+            minimumSize: const Size(20, 125),
+            side: const BorderSide(width: 3, color: Colors.white),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+          ),
+          onPressed: () {
+            setState(() => model.onFireButtonPressed());
+          },
+          child: const Text(
+            "Fire!",
+            style: TextStyle(
+              fontSize: 70,
+              fontFamily: 'Arial Rounded MT Bold',
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          )),
+    );
   }
 }
