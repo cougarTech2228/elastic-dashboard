@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_image_map/flutter_image_map.dart';
 import 'package:geekyants_flutter_gauges/geekyants_flutter_gauges.dart';
 import 'package:provider/provider.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 enum Mode {
   unknown,
@@ -282,6 +283,11 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
     return isClimberLocked() ? "Unlock" : "Lock";
   }
 
+  void onCollapseButtonPressed() {
+    ntConnection.updateDataFromTopic(modeTopic, "collapse");
+    ntConnection.updateDataFromTopic(executeCommandTopic, true);
+  }
+
   bool _validateSelection() {
     if (mode == Mode.algae) {
       coralLoaderSelected = false;
@@ -455,6 +461,10 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
   }
 
   void onGoButtonPressed() {
+    if (isCommandExecuting()) {
+      ntConnection.updateDataFromTopic(executeCommandTopic, false);
+      return;
+    }
     if (!_validateSelection()) {
       return;
     }
@@ -618,9 +628,9 @@ class ReefWidget extends NTWidget {
                     algaeButton(model, setState),
                     coralAndAlgaeButton(model, setState),
                     cageButton(model, setState),
+                    collapseButton(model, setState),
                     const Spacer(),
                     fireButton(model, setState),
-                    goButton(model, setState),
                   ],
                 ),
                 Row(
@@ -643,6 +653,14 @@ class ReefWidget extends NTWidget {
                     climberControls(model, setState, context),
                   ],
                 ),
+                Row(
+                  spacing: 10,
+                  children: [
+                    const Spacer(),
+                    goButton(model, setState),
+                    const Spacer(),
+                  ],
+                )
               ],
             );
           });
@@ -1214,6 +1232,37 @@ class ReefWidget extends NTWidget {
           setState(() => model.onCageButtonPressed());
         },
         child: Image.asset("assets/reef/cage.png"));
+  }
+
+  Widget collapseButton(ReefWidgetModel model, StateSetter setState) {
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: model.getCageColor(),
+        padding: const EdgeInsets.all(20.0),
+        fixedSize: const Size(200, 125),
+        side: const BorderSide(width: 3, color: Colors.white),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+      ),
+      onPressed: () {
+        setState(() => model.onCollapseButtonPressed());
+      },
+      child: const Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon( Symbols.stat_minus_3_rounded, size: 70),
+          Text(
+            "Collapse",
+            style: TextStyle(
+              fontSize: 20,
+              fontFamily: 'Arial Rounded MT Bold',
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      )
+    );
   }
 
   Widget fireButton(ReefWidgetModel model, StateSetter setState) {
