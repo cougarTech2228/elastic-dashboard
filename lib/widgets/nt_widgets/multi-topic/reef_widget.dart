@@ -16,6 +16,7 @@ enum Mode {
 }
 
 enum ReefLocation { unknown, L1, L2_L, L2_R, L3_L, L3_R, L4_L, L4_R }
+enum CoralLoaderSide { none, left, right, center }
 
 class ReefWidgetModel extends MultiTopicNTWidgetModel {
   @override
@@ -55,7 +56,7 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
   bool coralValid = true;
   bool coralAndAlgaeValid = true;
 
-  bool coralLoaderSelected = false;
+  CoralLoaderSide selectedLoaderSide = CoralLoaderSide.none;
   bool processorSelected = false;
   bool bargeSelected = false;
   bool floorAlgaeSelected = false;
@@ -160,7 +161,7 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
     print('onCoralButtonPressed');
     mode = Mode.coral;
     if (!loaded) {
-      coralLoaderSelected = true;
+      selectedLoaderSide = CoralLoaderSide.center;
     }
     _validateSelection();
   }
@@ -290,7 +291,7 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
 
   bool _validateSelection() {
     if (mode == Mode.algae) {
-      coralLoaderSelected = false;
+      selectedLoaderSide = CoralLoaderSide.none;
     }
 
     if (selectedReefSegment == 1 ||
@@ -330,7 +331,7 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
       }
 
       // we have coral, unselect the loader, so the next time it shows up it's not already selected
-      coralLoaderSelected = false;
+      selectedLoaderSide = CoralLoaderSide.none;
 
       reefAlgaeSelected = false;
       floorAlgaeSelected = false;
@@ -352,7 +353,7 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
 
     // return true if this is a valid selection to kick off a command
     bool valid = false;
-    if (coralLoaderSelected ||
+    if (selectedLoaderSide != CoralLoaderSide.none ||
         bargeSelected ||
         processorSelected ||
         floorAlgaeSelected ||
@@ -391,7 +392,7 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
     }
 
     selectedReefSegment = segment;
-    coralLoaderSelected = false;
+    selectedLoaderSide = CoralLoaderSide.none;
 
     if (!isCoralLoaded()) {
       mode = Mode.algae;
@@ -411,7 +412,7 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
   }
 
   void deselectAllDest() {
-    coralLoaderSelected = false;
+    selectedLoaderSide = CoralLoaderSide.none;
     bargeSelected = false;
     processorSelected = false;
 
@@ -427,7 +428,7 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
     switch (dest) {
       case "coralLoader":
         mode = Mode.coral;
-        coralLoaderSelected = true;
+        selectedLoaderSide = CoralLoaderSide.left;
         break;
       case "processor":
         mode = Mode.algae;
@@ -470,8 +471,12 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
     }
 
     String dest;
-    if (coralLoaderSelected) {
-      dest = "coralStation";
+    if (selectedLoaderSide == CoralLoaderSide.left) {
+      dest = "coralStationLeft";
+    } else if (selectedLoaderSide == CoralLoaderSide.right) {
+      dest = "coralStationRight";
+    } else if (selectedLoaderSide == CoralLoaderSide.center) {
+      dest = "coralStationCenter";
     } else if (bargeSelected) {
       dest = "barge";
     } else if (processorSelected) {
@@ -498,6 +503,19 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
     ntConnection.updateDataFromTopic(executeCommandTopic, false);
     ntConnection.updateDataFromTopic(modeTopic, "fire");
     ntConnection.updateDataFromTopic(executeCommandTopic, true);
+  }
+
+  void onCoralLoaderPressed(String title) {
+    mode = Mode.coral;
+    if (title == "right") {
+      selectedLoaderSide = CoralLoaderSide.right;
+    } else if (title == "left") {
+      selectedLoaderSide = CoralLoaderSide.left;
+    } else if (title == "center") {
+      selectedLoaderSide = CoralLoaderSide.center;
+    } else {
+      selectedLoaderSide = CoralLoaderSide.none;
+    }
   }
 
   void onReefAlgaePressed() {
@@ -535,12 +553,7 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
   }
 
   bool shouldShowCoralLoader() {
-    bool shouldShow = !loaded && mode == Mode.coral;
-    if (shouldShow) {
-      // this is the only valid option, mark it as selected
-      coralLoaderSelected = true;
-    }
-    return shouldShow;
+    return !loaded && mode == Mode.coral;
   }
 
   bool shouldShowReef() {
@@ -647,7 +660,7 @@ class ReefWidget extends NTWidget {
                     ),
                     reef(model, setState),
                     pipes(model, setState),
-                    coralLoader(model),
+                    coralLoader(model, setState),
                     processor(model, setState),
                     barge(model, setState),
                     climberControls(model, setState, context),
@@ -865,18 +878,56 @@ class ReefWidget extends NTWidget {
     );
   }
 
-  Widget coralLoader(ReefWidgetModel model) {
+  Widget coralLoader(ReefWidgetModel model, StateSetter setState) {
     return Visibility(
       visible: model.shouldShowCoralLoader(),
       child: Container(
         decoration: BoxDecoration(
-          color: selectedColor,
+          color: unselectedColor,
           borderRadius: const BorderRadius.all(Radius.circular(15)),
           border: Border.all(color: Colors.white, width: 2),
         ),
         constraints: BoxConstraints.tight(const Size(400, 400)),
-        child: Image.asset("assets/reef/coral_loader.png"),
-      ),
+        child: 
+          ImageMap(
+            image: Image.asset("assets/reef/coral_loader_front.png", fit: BoxFit.scaleDown),
+            onTap: (region) {
+              setState(
+                  () => model.onCoralLoaderPressed(region.title!));
+            },
+            regions: [
+              ImageMapRegion.fromRect(
+                rect: new Rect.fromPoints(
+                  const Offset(30, 14),
+                  const Offset(290, 660),
+                ),
+                color: model.selectedLoaderSide == CoralLoaderSide.left
+                    ? selectedColor
+                    : unselectedColor,
+                title: 'left',
+              ),
+              ImageMapRegion.fromRect(
+                rect: new Rect.fromPoints(
+                  const Offset(291, 14),
+                  const Offset(543, 660),
+                ),
+                color: model.selectedLoaderSide == CoralLoaderSide.center
+                    ? selectedColor
+                    : unselectedColor,
+                title: 'center',
+              ),
+              ImageMapRegion.fromRect(
+                rect: new Rect.fromPoints(
+                  const Offset(544, 14),
+                  const Offset(805, 660),
+                ),
+                color: model.selectedLoaderSide == CoralLoaderSide.right
+                    ? selectedColor
+                    : unselectedColor,
+                title: 'right',
+              ),
+            ]),
+      )
     );
   }
 
