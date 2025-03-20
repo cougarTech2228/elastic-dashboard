@@ -672,6 +672,8 @@ class ReefWidget extends NTWidget {
                     const Spacer(),
                     goButton(model, setState),
                     const Spacer(),
+                    extendButton(model, setState),
+
                   ],
                 )
               ],
@@ -1181,6 +1183,42 @@ class ReefWidget extends NTWidget {
             ]),
       ),
     );
+  }
+
+  Widget extendButton(ReefWidgetModel model, StateSetter setState) {
+    return ElevatedButton(
+      // Climber Extend Button
+      style: ElevatedButton.styleFrom(
+        backgroundColor: model.getClimberExtendColor(),
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+          minimumSize: const Size(20, 125),
+          side: const BorderSide(width: 3, color: Colors.white),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        // padding: const EdgeInsets.all(20.0),
+        // fixedSize: const Size(250, 250),
+        // side: const BorderSide(width: 3, color: Colors.white),
+        // shape: RoundedRectangleBorder(
+        //     borderRadius: BorderRadius.circular(30)),
+      ),
+      onPressed: () {
+        setState(() => model.onClimberExtendButtonPressed());
+      },
+      child: Column(
+        children: [
+          Image.asset("assets/reef/climb_arrow.png",
+              width: 85, height: 85),
+          const Text(
+            "Extend",
+            style: TextStyle(
+              fontSize: 40,
+              fontFamily: 'Arial Rounded MT Bold',
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ));
   }
 
   Widget goButton(ReefWidgetModel model, StateSetter setState) {
