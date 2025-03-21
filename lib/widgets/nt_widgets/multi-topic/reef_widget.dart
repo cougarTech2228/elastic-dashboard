@@ -199,7 +199,7 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
   }
 
   void onClimberExtendButtonPressed() {
-    ntConnection.updateDataFromTopic(modeTopic, "${mode.name}-extend");
+    ntConnection.updateDataFromTopic(modeTopic, "cage-extend");
     ntConnection.updateDataFromTopic(executeCommandTopic, true);
   }
 
