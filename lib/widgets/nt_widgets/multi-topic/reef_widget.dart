@@ -289,6 +289,11 @@ class ReefWidgetModel extends MultiTopicNTWidgetModel {
     ntConnection.updateDataFromTopic(executeCommandTopic, true);
   }
 
+  void onSpitButtonPressed() {
+    ntConnection.updateDataFromTopic(modeTopic, "spit");
+    ntConnection.updateDataFromTopic(executeCommandTopic, true);
+  }
+
   bool _validateSelection() {
     if (mode == Mode.algae) {
       selectedLoaderSide = CoralLoaderSide.none;
@@ -642,6 +647,7 @@ class ReefWidget extends NTWidget {
                     coralAndAlgaeButton(model, setState),
                     cageButton(model, setState),
                     collapseButton(model, setState),
+                    spitButton(model, setState),
                     const Spacer(),
                     fireButton(model, setState),
                   ],
@@ -1321,6 +1327,36 @@ class ReefWidget extends NTWidget {
           setState(() => model.onCageButtonPressed());
         },
         child: Image.asset("assets/reef/cage.png"));
+  }
+
+  Widget spitButton(ReefWidgetModel model, StateSetter setState) {
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: model.getCageColor(),
+        padding: const EdgeInsets.all(20.0),
+        fixedSize: const Size(200, 125),
+        side: const BorderSide(width: 3, color: Colors.white),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+      ),
+      onPressed: () {
+        setState(() => model.onSpitButtonPressed());
+      },
+      child: Column(
+        children: [
+          Image.asset("assets/reef/trash-can.png",
+              width: 70, height: 70),
+          const Text(
+            "Spit",
+            style: TextStyle(
+              fontSize: 20,
+              fontFamily: 'Arial Rounded MT Bold',
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ));
   }
 
   Widget collapseButton(ReefWidgetModel model, StateSetter setState) {
