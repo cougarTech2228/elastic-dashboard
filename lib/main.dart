@@ -75,7 +75,16 @@ void main() async {
 
   logger.debug('Display Information: - Screen Size: $screenSize');
 
-  const Size minimumSize = Size(436.5, 320.0);
+  late final double platformWidthAdjust;
+  if (Platform.isMacOS) {
+    platformWidthAdjust = 30;
+  } else if (Platform.isLinux) {
+    platformWidthAdjust = 10;
+  } else {
+    platformWidthAdjust = 0;
+  }
+
+  final Size minimumSize = Size(436.5 + platformWidthAdjust, 320.0);
 
   await windowManager.setMinimumSize(minimumSize);
   await windowManager.setTitleBarStyle(
@@ -183,24 +192,49 @@ class Elastic extends StatefulWidget {
   final SharedPreferences preferences;
   final String version;
 
-  const Elastic(
-      {super.key,
-      required this.ntConnection,
-      required this.preferences,
-      required this.version});
+  const Elastic({
+    super.key,
+    required this.ntConnection,
+    required this.preferences,
+    required this.version,
+  });
 
   @override
   State<Elastic> createState() => _ElasticState();
 }
 
 class _ElasticState extends State<Elastic> {
-  late Color teamColor = Color(
-      widget.preferences.getInt(PrefKeys.teamColor) ?? Colors.blueAccent.value);
+  late Color teamColor = Color(widget.preferences.getInt(PrefKeys.teamColor) ??
+      Colors.blueAccent.toARGB32());
   late FlexSchemeVariant themeVariant = FlexSchemeVariant.values
           .firstWhereOrNull((element) =>
               element.variantName ==
               widget.preferences.getString(PrefKeys.themeVariant)) ??
       FlexSchemeVariant.material3Legacy;
+
+  late final DashboardPageViewModel dashboardViewModel =
+      DashboardPageViewModelImpl(
+    ntConnection: widget.ntConnection,
+    preferences: widget.preferences,
+    version: widget.version,
+    onColorChanged: (color) => setState(() {
+      teamColor = color;
+      widget.preferences.setInt(PrefKeys.teamColor, color.toARGB32());
+    }),
+    onThemeVariantChanged: (variant) async {
+      themeVariant = variant;
+      if (variant == Defaults.themeVariant) {
+        await widget.preferences
+            .setString(PrefKeys.themeVariant, Defaults.defaultVariantName);
+      } else {
+        await widget.preferences
+            .setString(PrefKeys.themeVariant, variant.variantName);
+      }
+      setState(() {});
+    },
+  );
+
+  FlexTones get themeTones => themeVariant.tones(Brightness.dark);
 
   @override
   Widget build(BuildContext context) {
@@ -209,33 +243,25 @@ class _ElasticState extends State<Elastic> {
       colorScheme: SeedColorScheme.fromSeeds(
         primaryKey: teamColor,
         brightness: Brightness.dark,
-        variant: themeVariant,
+        tones: themeTones.copyWith(
+          // Use older (but incorrect) material 3 legacy tones from 2025 version
+          surfaceTone:
+              themeVariant == FlexSchemeVariant.material3Legacy ? 8 : null,
+          primaryMinChroma:
+              themeVariant == FlexSchemeVariant.material3Legacy ? 0 : null,
+          // Have the dialog color match the card colors
+          surfaceContainerHighTone:
+              themeVariant == FlexSchemeVariant.material3Legacy
+                  ? 8
+                  : themeTones.surfaceTone,
+        ),
       ),
     );
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: appTitle,
       theme: theme,
-      home: DashboardPage(
-        ntConnection: widget.ntConnection,
-        preferences: widget.preferences,
-        version: widget.version,
-        onColorChanged: (color) => setState(() {
-          teamColor = color;
-          widget.preferences.setInt(PrefKeys.teamColor, color.value);
-        }),
-        onThemeVariantChanged: (variant) async {
-          themeVariant = variant;
-          if (variant == Defaults.themeVariant) {
-            await widget.preferences
-                .setString(PrefKeys.themeVariant, Defaults.defaultVariantName);
-          } else {
-            await widget.preferences
-                .setString(PrefKeys.themeVariant, variant.variantName);
-          }
-          setState(() {});
-        },
-      ),
+      home: DashboardPage(model: dashboardViewModel),
     );
   }
 }

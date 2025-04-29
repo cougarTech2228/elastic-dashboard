@@ -432,7 +432,7 @@ class TabGridModel extends ChangeNotifier {
       );
     }
 
-    int? gridSize = preferences.getInt(PrefKeys.gridSize);
+    int gridSize = preferences.getInt(PrefKeys.gridSize) ?? Defaults.gridSize;
 
     double previewX =
         DraggableWidgetContainer.snapToGrid(constrainedRect.left, gridSize);
@@ -440,27 +440,51 @@ class TabGridModel extends ChangeNotifier {
         DraggableWidgetContainer.snapToGrid(constrainedRect.top, gridSize);
 
     double previewWidth = DraggableWidgetContainer.snapToGrid(
-        constrainedRect.width.clamp(model.minWidth, double.infinity), gridSize);
+      max(model.minWidth, constrainedRect.width),
+      gridSize,
+    );
     double previewHeight = DraggableWidgetContainer.snapToGrid(
-        constrainedRect.height.clamp(model.minHeight, double.infinity),
-        gridSize);
+      max(model.minHeight, constrainedRect.height),
+      gridSize,
+    );
 
     if (previewWidth < model.minWidth) {
       previewWidth = DraggableWidgetContainer.snapToGrid(
-          constrainedRect.width.clamp(model.minWidth, double.infinity) +
-              (gridSize ?? Defaults.gridSize),
-          gridSize);
+        max(model.minWidth, constrainedRect.width) + gridSize,
+        gridSize,
+      );
     }
 
     if (previewHeight < model.minHeight) {
       previewHeight = DraggableWidgetContainer.snapToGrid(
-          constrainedRect.height.clamp(model.minHeight, double.infinity) +
-              (preferences.getInt(PrefKeys.gridSize) ?? Defaults.gridSize),
-          gridSize);
+        max(model.minHeight, constrainedRect.height) + gridSize,
+        gridSize,
+      );
     }
 
-    Rect preview =
-        Rect.fromLTWH(previewX, previewY, previewWidth, previewHeight);
+    if (model.resizing) {
+      if (result.handle.influencesLeft) {
+        double snappedRight = DraggableWidgetContainer.snapToGrid(
+          constrainedRect.right,
+          gridSize,
+        );
+        previewX = snappedRight - previewWidth;
+      }
+      if (result.handle.influencesTop) {
+        double snappedBottom = DraggableWidgetContainer.snapToGrid(
+          constrainedRect.bottom,
+          gridSize,
+        );
+        previewY = snappedBottom - previewHeight;
+      }
+    }
+
+    Rect preview = Rect.fromLTWH(
+      previewX,
+      previewY,
+      previewWidth,
+      previewHeight,
+    );
 
     model.draggingRect = constrainedRect;
     model.previewRect = preview;
@@ -796,7 +820,6 @@ class TabGrid extends StatelessWidget {
         return ChangeNotifierProvider<NTWidgetContainerModel>.value(
           value: widgetModel,
           child: DraggableNTWidgetContainer(
-            key: widgetModel.key,
             updateFunctions: (
               onUpdate: model._ntContainerOnUpdate,
               onDragBegin: model._ntContainerOnDragBegin,
@@ -812,7 +835,6 @@ class TabGrid extends StatelessWidget {
         return ChangeNotifierProvider<ListLayoutModel>.value(
           value: widgetModel,
           child: DraggableListLayout(
-            key: widgetModel.key,
             updateFunctions: (
               onUpdate: model._layoutContainerOnUpdate,
               onDragBegin: model._layoutContainerOnDragBegin,
@@ -868,7 +890,7 @@ class TabGrid extends StatelessWidget {
                   visible: container.previewVisible,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.25),
+                      color: Colors.white.withValues(alpha: 0.25),
                       borderRadius: BorderRadius.circular(
                           model.preferences.getDouble(PrefKeys.cornerRadius) ??
                               Defaults.cornerRadius),
@@ -884,6 +906,7 @@ class TabGrid extends StatelessWidget {
 
       dashboardWidgets.add(
         GestureDetector(
+          key: container.key,
           onSecondaryTapUp: (details) {
             if (model.preferences.getBool(PrefKeys.layoutLocked) ??
                 Defaults.layoutLocked) {
@@ -992,8 +1015,8 @@ class TabGrid extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               color: (validLocation)
-                  ? Colors.white.withOpacity(0.25)
-                  : Colors.black.withOpacity(0.1),
+                  ? Colors.white.withValues(alpha: 0.25)
+                  : Colors.black.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(
                   model.preferences.getDouble(PrefKeys.cornerRadius) ??
                       Defaults.cornerRadius),
